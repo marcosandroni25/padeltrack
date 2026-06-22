@@ -1,1066 +1,1562 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PÁDELTRACK - Registra cada jugada</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #0a0f1a;
-            color: #f1f5f9;
-        }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
-    <script type="text/babel">
-        const { useState, useMemo, useEffect, useRef, useCallback } = React;
+const SHOT_TYPES = [
+  { id: "S1", label: "S1", group: "Saque" },
+  { id: "S2", label: "S2", group: "Saque" },
+  { id: "D", label: "D", group: "Fondo" },
+  { id: "DP", label: "D P", group: "Fondo" },
+  { id: "R", label: "R", group: "Fondo" },
+  { id: "RP", label: "R P", group: "Fondo" },
+  { id: "GloD", label: "Glo D", group: "Globo" },
+  { id: "GloDP", label: "Glo DP", group: "Globo" },
+  { id: "GloR", label: "Glo R", group: "Globo" },
+  { id: "GloRP", label: "Glo RP", group: "Globo" },
+  { id: "VolD", label: "Vol D", group: "Red" },
+  { id: "VolR", label: "Vol R", group: "Red" },
+  { id: "Sm", label: "Sm", group: "Remate" },
+  { id: "Smx3", label: "Sm x3", group: "Remate" },
+  { id: "Smx4", label: "Sm x4", group: "Remate" },
+  { id: "BajPD", label: "Baj PD", group: "Especial" },
+  { id: "BajPR", label: "Baj PR", group: "Especial" },
+  { id: "VibBand", label: "Vib/Band", group: "Especial" },
+  { id: "Rulo", label: "Rulo", group: "Especial" },
+];
 
-        const SHOT_TYPES = [
-            { id: "S1", label: "S1", group: "Saque" },
-            { id: "S2", label: "S2", group: "Saque" },
-            { id: "D", label: "D", group: "Fondo" },
-            { id: "DP", label: "D P", group: "Fondo" },
-            { id: "R", label: "R", group: "Fondo" },
-            { id: "RP", label: "R P", group: "Fondo" },
-            { id: "GloD", label: "Glo D", group: "Globo" },
-            { id: "GloDP", label: "Glo DP", group: "Globo" },
-            { id: "GloR", label: "Glo R", group: "Globo" },
-            { id: "GloRP", label: "Glo RP", group: "Globo" },
-            { id: "VolD", label: "Vol D", group: "Red" },
-            { id: "VolR", label: "Vol R", group: "Red" },
-            { id: "Sm", label: "Sm", group: "Remate" },
-            { id: "Smx3", label: "Sm x3", group: "Remate" },
-            { id: "Smx4", label: "Sm x4", group: "Remate" },
-            { id: "BajPD", label: "Baj PD", group: "Especial" },
-            { id: "BajPR", label: "Baj PR", group: "Especial" },
-            { id: "VibBand", label: "Vib/Band", group: "Especial" },
-            { id: "Rulo", label: "Rulo", group: "Especial" },
-        ];
+const RESULTS = [
+  { id: "ErrNF", label: "Err NF", type: "error", color: "#ef4444" },
+  { id: "Win", label: "Win", type: "winner", color: "#22c55e" },
+  { id: "ErrF", label: "Err F", type: "forced", color: "#f97316" },
+  { id: "FzaErr", label: "Fza Err", type: "forced", color: "#f97316" },
+];
 
-        const RESULTS = [
-            { id: "ErrNF", label: "Err NF", type: "error", color: "#ef4444" },
-            { id: "Win", label: "Win", type: "winner", color: "#22c55e" },
-            { id: "ErrF", label: "Err F", type: "forced", color: "#f97316" },
-            { id: "FzaErr", label: "Fza Err", type: "forced", color: "#f97316" },
-        ];
+const SCORE_SEQ = ["0", "15", "30", "40"];
+function nextScore(c) {
+  const i = SCORE_SEQ.indexOf(c);
+  return i < SCORE_SEQ.length - 1 ? SCORE_SEQ[i + 1] : c;
+}
 
-        const SCORE_SEQ = ["0", "15", "30", "40"];
-        function nextScore(c) {
-            const i = SCORE_SEQ.indexOf(c);
-            return i < SCORE_SEQ.length - 1 ? SCORE_SEQ[i + 1] : c;
-        }
+const SHOT_GROUPS = [...new Set(SHOT_TYPES.map(s => s.group))];
 
-        const SHOT_GROUPS = [...new Set(SHOT_TYPES.map(s => s.group))];
+function ResultBadge({ result }) {
+  const r = RESULTS.find(x => x.id === result);
+  if (!r) return null;
+  return (
+    <span style={{
+      padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+      background: r.color + "22", color: r.color, border: `1px solid ${r.color}44`
+    }}>
+      {r.label}
+    </span>
+  );
+}
 
-        function ResultBadge({ result }) {
-            const r = RESULTS.find(x => x.id === result);
-            if (!r) return null;
-            return (
-                <span style={{
-                    padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-                    background: r.color + "22", color: r.color, border: `1px solid ${r.color}44`
+function ShotBadge({ shot }) {
+  return (
+    <span style={{
+      padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700,
+      background: "rgba(99,179,237,0.15)", color: "#63b3ed", border: "1px solid rgba(99,179,237,0.3)"
+    }}>
+      {shot}
+    </span>
+  );
+}
+
+function SetupScreen({ onStart }) {
+  const [t1p1, setT1p1] = useState("Ugo");
+  const [t1p2, setT1p2] = useState("Marco");
+  const [t2p1, setT2p1] = useState("Haymar");
+  const [t2p2, setT2p2] = useState("Herni");
+  const [serving, setServing] = useState("t1p1");
+  const [selectingSecondServer, setSelectingSecondServer] = useState(null);
+  const [secondServing, setSecondServing] = useState(null);
+  const [sets, setSets] = useState("2");
+  const [deuceRule, setDeuceRule] = useState("advantage");
+
+  const ready = t1p1 && t1p2 && t2p1 && t2p2;
+  const inp = {
+    width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 8, padding: "10px 14px", color: "#f1f5f9", fontSize: 14, outline: "none",
+    fontFamily: "inherit", boxSizing: "border-box"
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: "#0a0f1a", display: "flex", alignItems: "center",
+      justifyContent: "center", fontFamily: "'Outfit', sans-serif", padding: 20
+    }}>
+      <div style={{ width: "100%", maxWidth: 580 }}>
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg, #f59e0b, #ef4444)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22
+            }}>
+              🎾
+            </div>
+            <span style={{ fontSize: 28, fontWeight: 900, color: "#f1f5f9", letterSpacing: "-0.03em" }}>
+              PÁDEL<span style={{ color: "#f59e0b" }}>TRACK</span>
+            </span>
+          </div>
+          <p style={{ color: "#64748b", fontSize: 14, margin: 0 }}>Registra cada jugada. Analiza cada partido.</p>
+        </div>
+        <div style={{
+          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 16, padding: 32
+        }}>
+          <p style={{
+            color: "#94a3b8", fontSize: 12, fontWeight: 700, letterSpacing: "0.1em",
+            marginBottom: 28, marginTop: 0
+          }}>
+            CONFIGURAR PARTIDO
+          </p>
+
+          <div style={{ marginBottom: 28 }}>
+            <p style={{
+              color: "#94a3b8", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              marginBottom: 12, marginTop: 0
+            }}>
+              JUGADORES
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+              <div>
+                <p style={{
+                  color: "#f59e0b", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+                  marginBottom: 10, marginTop: 0
                 }}>
-                    {r.label}
-                </span>
-            );
-        }
-
-        function ShotBadge({ shot }) {
-            return (
-                <span style={{
-                    padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700,
-                    background: "rgba(99,179,237,0.15)", color: "#63b3ed", border: "1px solid rgba(99,179,237,0.3)"
+                  EQUIPO 1
+                </p>
+                <input style={{ ...inp, marginBottom: 10 }} placeholder="Jugador 1" value={t1p1} onChange={e => setT1p1(e.target.value)} />
+                <input style={inp} placeholder="Jugador 2" value={t1p2} onChange={e => setT1p2(e.target.value)} />
+              </div>
+              <div>
+                <p style={{
+                  color: "#63b3ed", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+                  marginBottom: 10, marginTop: 0
                 }}>
-                    {shot}
-                </span>
-            );
+                  EQUIPO 2
+                </p>
+                <input style={{ ...inp, marginBottom: 10 }} placeholder="Jugador 3" value={t2p1} onChange={e => setT2p1(e.target.value)} />
+                <input style={inp} placeholder="Jugador 4" value={t2p2} onChange={e => setT2p2(e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 28 }}>
+            <p style={{
+              color: "#94a3b8", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              marginBottom: 12, marginTop: 0
+            }}>
+              SACA PRIMERO
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+              {[
+                { id: "t1p1", label: t1p1 || "Jug 1" },
+                { id: "t1p2", label: t1p2 || "Jug 2" },
+                { id: "t2p1", label: t2p1 || "Jug 3" },
+                { id: "t2p2", label: t2p2 || "Jug 4" }
+              ].map(opt => (
+                <button key={opt.id} onClick={() => {
+                  setServing(opt.id);
+                }} style={{
+                  padding: "10px 8px", borderRadius: 8, border: "1px solid",
+                  borderColor: serving === opt.id ? "#f59e0b" : "rgba(255,255,255,0.1)",
+                  background: serving === opt.id ? "rgba(245,158,11,0.15)" : "transparent",
+                  color: serving === opt.id ? "#f59e0b" : "#94a3b8",
+                  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "center"
+                }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 28 }}>
+            <p style={{
+              color: "#94a3b8", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              marginBottom: 12, marginTop: 0
+            }}>
+              NÚMERO DE SETS
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {["1", "3"].map(n => (
+                <button key={n} onClick={() => setSets(n)} style={{
+                  padding: "12px", borderRadius: 8, border: "1px solid",
+                  borderColor: sets === n ? "#63b3ed" : "rgba(255,255,255,0.1)",
+                  background: sets === n ? "rgba(99,179,237,0.15)" : "transparent",
+                  color: sets === n ? "#63b3ed" : "#94a3b8",
+                  fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit"
+                }}>
+                  {n} Set{n !== "1" ? "s" : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 28 }}>
+            <p style={{
+              color: "#94a3b8", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+              marginBottom: 12, marginTop: 0
+            }}>
+              REGLA EN 40-40
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[
+                { id: "goldenPoint", label: "Golden Point" },
+                { id: "advantage", label: "Advantage" }
+              ].map(opt => (
+                <button key={opt.id} onClick={() => setDeuceRule(opt.id)} style={{
+                  padding: "12px", borderRadius: 8, border: "1px solid",
+                  borderColor: deuceRule === opt.id ? "#22c55e" : "rgba(255,255,255,0.1)",
+                  background: deuceRule === opt.id ? "rgba(34,197,94,0.15)" : "transparent",
+                  color: deuceRule === opt.id ? "#22c55e" : "#94a3b8",
+                  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "center"
+                }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button disabled={!ready} onClick={() => onStart({ t1p1, t1p2, t2p1, t2p2, serving, secondServing, sets: parseInt(sets), deuceRule })} style={{
+            width: "100%", padding: "14px", borderRadius: 10, border: "none",
+            background: ready ? "linear-gradient(135deg, #f59e0b, #ef4444)" : "rgba(255,255,255,0.05)",
+            color: ready ? "#0a0f1a" : "#475569",
+            fontSize: 15, fontWeight: 800, cursor: ready ? "pointer" : "not-allowed",
+            letterSpacing: "0.05em", fontFamily: "inherit"
+          }}>
+            INICIAR PARTIDO →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TrackerScreen({ config, events, onAddEvent, onUndo, onDeleteEvent, onFinish, onSetupBack }) {
+  const [selPlayer, setSelPlayer] = useState(null);
+  const [selShot, setSelShot] = useState(null);
+  const [selResult, setSelResult] = useState(null);
+  const [selVictim, setSelVictim] = useState(null);
+  const [selVictimShot, setSelVictimShot] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [serveFirstPlayers, setServeFirstPlayers] = useState({
+    t1: config.serving.startsWith("t1") ? config.serving : (config.serving.startsWith("t2") ? null : config.serving),
+    t2: config.secondServing && config.secondServing.startsWith("t2") ? config.secondServing : null
+  });
+  const [serveSecondPlayers, setServeSecondPlayers] = useState({ t1: null, t2: null });
+  const [secondServer, setSecondServer] = useState(null); // The second server (chosen after game 1)
+  const [pendingServeChoice, setPendingServeChoice] = useState(null);
+  const [scoreModifiers, setScoreModifiers] = useState({
+    points: { t1: 0, t2: 0 },
+    games: { t1: 0, t2: 0 },
+    sets: { t1: 0, t2: 0 }
+  });
+  const lastGameClickRef = useRef(0);
+  const gameButtonDisabledRef = useRef(false);
+  const [tiebreakNotification, setTiebreakNotification] = useState(false);
+  const [prevGamesState, setPrevGamesState] = useState({ t1: 0, t2: 0 });
+  const [serverSequence, setServerSequence] = useState(null); // Complete sequence [s1, s2, s3, s4]
+  const [setWinner, setSetWinner] = useState(null); // Track set winner for modal
+  const [matchWinner, setMatchWinner] = useState(null); // Track match winner
+
+  // Define players array - memoized to prevent recreation
+  const players = useMemo(() => [
+    { id: "t1p1", name: config.t1p1, team: "t1", color: "#f59e0b" },
+    { id: "t1p2", name: config.t1p2, team: "t1", color: "#f59e0b" },
+    { id: "t2p1", name: config.t2p1, team: "t2", color: "#63b3ed" },
+    { id: "t2p2", name: config.t2p2, team: "t2", color: "#63b3ed" },
+  ], [config.t1p1, config.t1p2, config.t2p1, config.t2p2]);
+
+  // Get server for a specific game (1-indexed)
+  const getServerForGame = useCallback((gameNumber) => {
+    if (!secondServer) return config.serving;
+    
+    const firstServer = config.serving;
+    const firstServerPlayer = players.find(p => p.id === firstServer);
+    const secondServerPlayer = players.find(p => p.id === secondServer);
+    
+    if (!firstServerPlayer || !secondServerPlayer) return firstServer;
+    
+    const firstServerTeam = firstServerPlayer.team;
+    const secondServerTeam = secondServerPlayer.team;
+    
+    // Find partners
+    const firstServerPartner = players.find(p => p.team === firstServerTeam && p.id !== firstServer);
+    const secondServerPartner = players.find(p => p.team === secondServerTeam && p.id !== secondServer);
+    
+    if (!firstServerPartner || !secondServerPartner) return firstServer;
+    
+    // Rotation sequence: [firstServer, secondServer, firstServerPartner, secondServerPartner]
+    const sequence = [firstServer, secondServer, firstServerPartner.id, secondServerPartner.id];
+    const index = (gameNumber - 1) % 4;
+    const result = sequence[index];
+    
+    console.log(`getServerForGame(${gameNumber}): sequence=[${sequence.map(s => players.find(p => p.id === s)?.name || s).join(', ')}], index=${index}, result=${result} (${players.find(p => p.id === result)?.name})`);
+    
+    return result;
+  }, [config.serving, secondServer, players]);
+
+
+  const handleScoreModify = (team, type, delta) => {
+    // Use ref to immediately prevent double clicks
+    if (type === "games") {
+      if (gameButtonDisabledRef.current) return;
+      gameButtonDisabledRef.current = true;
+      setTimeout(() => {
+        gameButtonDisabledRef.current = false;
+      }, 500);
+    }
+    
+    setScoreModifiers(prev => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        [team]: Math.max(0, prev[type][team] + delta)
+      }
+    }));
+  };
+
+  // Helper to convert point values for modification
+  const getModifiablePoints = (pointsStr, modifier) => {
+    const pointsMap = { "0": 0, "15": 1, "30": 2, "40": 3, "AD": 4 };
+    const reversePointsMap = { 0: "0", 1: "15", 2: "30", 3: "40", 4: "AD" };
+    const currentValue = pointsMap[pointsStr] || 0;
+    const newValue = Math.max(0, Math.min(4, currentValue + modifier));
+    return reversePointsMap[newValue] || pointsStr;
+  };
+  const currentPlayer = players.find(p => p.id === selPlayer);
+  const resultObj = RESULTS.find(r => r.id === selResult);
+  const isForced = resultObj?.type === "forced";
+  const canRegister = selPlayer && selShot && selResult && (!isForced || (selVictim && selVictimShot));
+
+  // Auto-register when result is selected and form is complete
+  useEffect(() => {
+    if (canRegister && selResult) {
+      // Small delay to ensure all state is updated
+      const timer = setTimeout(() => {
+        handleRegister();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [selResult, canRegister]);
+
+  function handleRegister() {
+    if (!canRegister) return;
+    
+    const shotObj = SHOT_TYPES.find(s => s.id === selShot);
+    const isServeShot = shotObj?.group === "Saque";
+    const isWinOrErrNF = selResult === "Win" || selResult === "ErrNF";
+    const currentServerName = players.find(p => p.id === currentServer)?.name;
+    
+    // Validate: only the current server can win or err on S1/S2
+    if (isServeShot && isWinOrErrNF && selPlayer !== currentServer) {
+      setErrorMessage(`⚠️ Solo el jugador que está sirviendo puede ganar o cometer error en el servicio.\n\nActualmente está sirviendo: ${currentServerName}`);
+      return;
+    }
+    
+    const victimShotObj = selVictimShot ? SHOT_TYPES.find(s => s.id === selVictimShot) : null;
+    onAddEvent({
+      player: selPlayer, playerName: currentPlayer.name, team: currentPlayer.team,
+      shot: selShot, shotLabel: shotObj?.label,
+      result: selResult, resultLabel: resultObj?.label, resultType: resultObj?.type,
+      victim: isForced ? selVictim : null,
+      victimName: isForced ? players.find(p => p.id === selVictim)?.name : null,
+      victimShot: isForced ? selVictimShot : null,
+      victimShotLabel: isForced ? victimShotObj?.label : null,
+      isServe: shotObj?.group === "Saque",
+    });
+    setSelShot(null);
+    setSelResult(null);
+    setSelVictim(null);
+    setSelVictimShot(null);
+    // Keep all modifiers - will reset points modifier after game ends
+  }
+
+  useEffect(() => {
+    // Reset only points and sets when events change, keep games modifier as baseline
+    setScoreModifiers(prev => ({
+      points: { t1: 0, t2: 0 },
+      games: prev.games,
+      sets: { t1: 0, t2: 0 }
+    }));
+  }, [events.length]);
+
+  const lastServersFromEvents = useMemo(() => {
+    const last = { t1: config.serving, t2: null };
+    events.forEach(ev => {
+      if (ev.isServe) {
+        last[ev.team] = ev.player;
+      }
+    });
+    return last;
+  }, [events, config.serving]);
+
+  const { sets, games, points, currentServer, deuceState, isTiebreak } = useMemo(
+    () => calculateScore(events, config, players, serveFirstPlayers, lastServersFromEvents, scoreModifiers.games, scoreModifiers.points, serveSecondPlayers, secondServer, getServerForGame),
+    [events, config, players, serveFirstPlayers, lastServersFromEvents, scoreModifiers.games, scoreModifiers.points, serveSecondPlayers, secondServer, getServerForGame]
+  );
+
+  // Build complete sequence when secondServer is selected
+  useEffect(() => {
+    console.log(`[useEffect serverSequence] secondServer=${secondServer}, players.length=${players.length}`);
+    if (secondServer && players.length === 4) {
+      const firstServer = config.serving;
+      const firstServerPlayer = players.find(p => p.id === firstServer);
+      const secondServerPlayer = players.find(p => p.id === secondServer);
+      
+      console.log(`[serverSequence] firstServer=${firstServer} (${firstServerPlayer?.name}), secondServer=${secondServer} (${secondServerPlayer?.name})`);
+      
+      if (!firstServerPlayer || !secondServerPlayer) {
+        console.log(`[serverSequence] ERROR: Missing player!`);
+        return;
+      }
+      
+      const firstServerTeam = firstServerPlayer.team;
+      const secondServerTeam = secondServerPlayer.team;
+      
+      const firstServerPartner = players.find(p => p.team === firstServerTeam && p.id !== firstServer);
+      const secondServerPartner = players.find(p => p.team === secondServerTeam && p.id !== secondServer);
+      
+      console.log(`[serverSequence] partners: firstPartner=${firstServerPartner?.name}, secondPartner=${secondServerPartner?.name}`);
+      
+      if (!firstServerPartner || !secondServerPartner) {
+        console.log(`[serverSequence] ERROR: Missing partner!`);
+        return;
+      }
+      
+      const sequence = [firstServer, secondServer, firstServerPartner.id, secondServerPartner.id];
+      console.log(`[serverSequence] FINAL: ${sequence.map(s => players.find(p => p.id === s)?.name).join(' → ')}`);
+      setServerSequence(sequence);
+    } else {
+      console.log(`[serverSequence] Condition not met: secondServer=${secondServer}, players.length=${players.length}`);
+    }
+  }, [secondServer, config.serving, players]);
+
+  // Calculate completed games ONCE at the top level
+  const completedGames = useMemo(() => {
+    const total = games.t1 + games.t2 + scoreModifiers.games.t1 + scoreModifiers.games.t2;
+    console.log(`[completedGames calc] games: t1=${games.t1} t2=${games.t2}, modifiers: t1=${scoreModifiers.games.t1} t2=${scoreModifiers.games.t2}, total=${total}`);
+    return total;
+  }, [games.t1, games.t2, scoreModifiers.games.t1, scoreModifiers.games.t2]);
+
+  // Detect when a set is won and show modal
+  const prevSetsLengthRef = useRef(0);
+  useEffect(() => {
+    if (sets.length > prevSetsLengthRef.current) {
+      // A new set was just completed
+      const lastSet = sets[sets.length - 1];
+      const t1SetsWon = sets.filter(s => s.t1 > s.t2).length + scoreModifiers.sets.t1;
+      const t2SetsWon = sets.filter(s => s.t2 > s.t1).length + scoreModifiers.sets.t2;
+      
+      // Determine set winner
+      if (lastSet.t1 > lastSet.t2) {
+        setSetWinner("t1");
+        // Check if match is won (need to win config.sets)
+        const setsNeeded = parseInt(config.sets) || 2;
+        if (t1SetsWon >= setsNeeded) {
+          setMatchWinner("t1");
         }
+      } else if (lastSet.t2 > lastSet.t1) {
+        setSetWinner("t2");
+        const setsNeeded = parseInt(config.sets) || 2;
+        if (t2SetsWon >= setsNeeded) {
+          setMatchWinner("t2");
+        }
+      }
+    }
+    prevSetsLengthRef.current = sets.length;
+  }, [sets, scoreModifiers.sets, config.sets]);
 
-        function SetupScreen({ onStart }) {
-            const [t1p1, setT1p1] = useState("Ugo");
-            const [t1p2, setT1p2] = useState("Marco");
-            const [t2p1, setT2p1] = useState("Haymar");
-            const [t2p2, setT2p2] = useState("Herni");
-            const [serving, setServing] = useState("t1p1");
-            const [sets, setSets] = useState("2");
-            const [deuceRule, setDeuceRule] = useState("advantage");
+  // Detect when we reach 6-6 in games and show tiebreak notification
+  const prevGamesRef = useRef(null);
+  useEffect(() => {
+    console.log(`[TieBreak Check] Current games: ${games.t1}-${games.t2}, isTiebreak: ${isTiebreak}, notification: ${tiebreakNotification}`);
+    
+    // Check if we just reached 6-6
+    const is66Now = games.t1 === 6 && games.t2 === 6;
+    const was66Before = prevGamesRef.current && prevGamesRef.current.t1 === 6 && prevGamesRef.current.t2 === 6;
+    
+    if (is66Now && !was66Before && !tiebreakNotification) {
+      console.log(`[TieBreak Detection] ✓ REACHED 6-6! SHOWING TIEBREAK NOTIFICATION`);
+      setTiebreakNotification(true);
+    }
+    
+    prevGamesRef.current = { t1: games.t1, t2: games.t2 };
+  }, [games, isTiebreak]);
 
-            const ready = t1p1 && t1p2 && t2p1 && t2p2;
-            const inp = {
-                width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 8, padding: "10px 14px", color: "#f1f5f9", fontSize: 14, outline: "none",
-                fontFamily: "inherit", boxSizing: "border-box"
-            };
+  useEffect(() => {
+    if (events.length === 0) {
+      setPendingServeChoice(null);
+      return;
+    }
 
-            return (
+    // Calculate last servers for previous events
+    const getLastServersForEvents = (evList) => {
+      const last = { t1: config.serving, t2: null };
+      evList.forEach(ev => {
+        if (ev.isServe) {
+          last[ev.team] = ev.player;
+        }
+      });
+      return last;
+    };
+
+    const prevLastServers = events.length > 1 ? getLastServersForEvents(events.slice(0, -1)) : { t1: config.serving, t2: null };
+    
+    // Use previous games state to detect changes
+    let prevGames = prevGamesState;
+    if (events.length > 1) {
+      const prevScore = calculateScore(events.slice(0, -1), config, players, serveFirstPlayers, prevLastServers, prevGamesState, scoreModifiers.points, serveSecondPlayers);
+      prevGames = prevScore.games;
+    }
+    
+    const currentGames = games;
+
+    const gameEnded = (prevGames.t1 !== currentGames.t1) || (prevGames.t2 !== currentGames.t2);
+
+    if (gameEnded) {
+      // Reset points and sets modifiers when game ends, keep games modifier
+      setScoreModifiers(prev => ({
+        points: { t1: 0, t2: 0 },
+        games: prev.games,
+        sets: { t1: 0, t2: 0 }
+      }));
+
+      // Check if we need to ask for the first server of the other team
+      const totalGamesBefore = prevGames.t1 + prevGames.t2;
+      const totalGamesNow = currentGames.t1 + currentGames.t2;
+      
+      // Only ask after the first game ends - ask for second server from opposite team
+      if (totalGamesBefore === 0 && totalGamesNow === 1) {
+        if (!secondServer && !pendingServeChoice) {
+          const firstServer = config.serving;
+          const firstServerPlayer = players.find(p => p.id === firstServer);
+          const firstServerTeam = firstServerPlayer?.team;
+          const oppositeTeam = firstServerTeam === "t1" ? "t2" : "t1";
+          
+          // Get players from opposite team
+          const oppositeTeamPlayers = players.filter(p => p.team === oppositeTeam);
+          
+          setPendingServeChoice({
+            team: oppositeTeam,
+            players: oppositeTeamPlayers,
+            gameNumber: 2
+          });
+        }
+      }
+
+      // Tiebreak notification is handled naturally when 6-6 is reached during gameplay
+      // No need to manually trigger it here
+
+      const currentServerTeam = players.find(p => p.id === currentServer)?.team;
+      
+      const prevScore = events.length > 1 
+        ? calculateScore(events.slice(0, -1), config, players, serveFirstPlayers, prevLastServers, prevGamesState, scoreModifiers.points, serveSecondPlayers)
+        : { currentServer: config.serving };
+      const prevServer = prevScore.currentServer;
+      const prevServerTeam = players.find(p => p.id === prevServer)?.team;
+
+      // Ask for serve choice when server changes to a team that hasn't served yet in this set
+      // BUT only if we don't have the new secondServer system active
+      if (!secondServer && currentServerTeam && prevServerTeam && currentServerTeam !== prevServerTeam && !pendingServeChoice) {
+        if (serveFirstPlayers[currentServerTeam] === undefined || serveFirstPlayers[currentServerTeam] === null) {
+          // We don't know who serves first for this team yet
+          const teamPlayers = players.filter(p => p.team === currentServerTeam);
+          setPendingServeChoice({ team: currentServerTeam, players: teamPlayers });
+        }
+      }
+    }
+  }, [events.length, games.t1, games.t2, scoreModifiers.games]);
+
+  // Update previous games state when current games change
+  useEffect(() => {
+    setPrevGamesState({ ...scoreModifiers.games });
+  }, [scoreModifiers.games]);
+
+  const prevGamesCountRef = useRef(0); // Track previous game count to detect change from 0 to 1
+
+  // Handle first game completion via modifiers (when pressing "+" without events)
+  useEffect(() => {
+    if (events.length === 0) {
+      const totalGamesFromModifiers = scoreModifiers.games.t1 + scoreModifiers.games.t2;
+      const prevGamesCount = prevGamesCountRef.current;
+      
+      // ONLY open modal when games change from 0 to exactly 1 (first time)
+      if (totalGamesFromModifiers === 1 && prevGamesCount === 0 && !secondServer && !pendingServeChoice) {
+        console.log(`[Modal Trigger] First game added (0→1), opening modal for second server selection`);
+        
+        const firstServer = config.serving;
+        const firstServerPlayer = players.find(p => p.id === firstServer);
+        const firstServerTeam = firstServerPlayer?.team;
+        const oppositeTeam = firstServerTeam === "t1" ? "t2" : "t1";
+        const oppositeTeamPlayers = players.filter(p => p.team === oppositeTeam);
+        
+        setPendingServeChoice({
+          team: oppositeTeam,
+          players: oppositeTeamPlayers,
+          gameNumber: 2
+        });
+      }
+      
+      // Update the ref for next render
+      prevGamesCountRef.current = totalGamesFromModifiers;
+    }
+  }, [scoreModifiers.games, events.length, secondServer, pendingServeChoice, config.serving, players]);
+
+  // Close modal when server is selected
+  useEffect(() => {
+    if (pendingServeChoice && pendingServeChoice.isSecondServer && serveSecondPlayers[pendingServeChoice.team]) {
+      setPendingServeChoice(null);
+    } else if (pendingServeChoice && !pendingServeChoice.isSecondServer && serveFirstPlayers[pendingServeChoice.team]) {
+      setPendingServeChoice(null);
+    }
+  }, [serveFirstPlayers, serveSecondPlayers]);
+
+  const btn = {
+    borderRadius: 7, border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(255,255,255,0.04)", color: "#94a3b8", fontSize: 12,
+    fontWeight: 700, cursor: "pointer", padding: "8px 6px", fontFamily: "inherit",
+    letterSpacing: "0.03em"
+  };
+
+  const sel = (active, color = "#f59e0b") => active ? {
+    borderColor: color, background: color + "22", color
+  } : {};
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: "#0a0f1a", fontFamily: "'Outfit', sans-serif",
+      color: "#f1f5f9", overflow: "hidden"
+    }}>
+      <div style={{
+        background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.06)",
+        padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 8, flexWrap: "wrap"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={onSetupBack} style={{
+            background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 6, color: "#e2e8f0", cursor: "pointer", fontSize: 12, padding: "6px 10px",
+            fontFamily: "inherit", fontWeight: 600
+          }}>
+            ← Setup
+          </button>
+          <span style={{ fontSize: 14, fontWeight: 900, letterSpacing: "-0.02em" }}>
+            PÁDEL<span style={{ color: "#f59e0b" }}>TRACK</span>
+          </span>
+        </div>
+
+        <div style={{
+          display: "flex", alignItems: "center", gap: 20, padding: "10px 16px",
+          background: "rgba(255,255,255,0.05)", borderRadius: 10,
+          border: "1px solid rgba(255,255,255,0.1)"
+        }}>
+          <div style={{ textAlign: "center", minWidth: 110 }}>
+            <div style={{
+              fontSize: 9, color: "#f59e0b", fontWeight: 700, letterSpacing: "0.08em",
+              marginBottom: 10
+            }}>
+              {config.t1p1.split(" ")[0].toUpperCase()} / {config.t1p2.split(" ")[0].toUpperCase()}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center" }}>
+              <div style={{ textAlign: "center" }}>
                 <div style={{
-                    minHeight: "100vh", background: "#0a0f1a", display: "flex", alignItems: "center",
-                    justifyContent: "center", fontFamily: "'Outfit', sans-serif", padding: 20
+                  fontSize: 18, fontWeight: 900, color: "#f59e0b", lineHeight: 1
                 }}>
-                    <div style={{ width: "100%", maxWidth: 580 }}>
-                        <div style={{ textAlign: "center", marginBottom: 48 }}>
-                            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                                <div style={{
-                                    width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg, #f59e0b, #ef4444)",
-                                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22
-                                }}>
-                                    🎾
-                                </div>
-                                <span style={{ fontSize: 28, fontWeight: 900, color: "#f1f5f9", letterSpacing: "-0.03em" }}>
-                                    PÁDEL<span style={{ color: "#f59e0b" }}>TRACK</span>
-                                </span>
-                            </div>
-                            <p style={{ color: "#64748b", fontSize: 14, margin: 0 }}>Registra cada jugada. Analiza cada partido.</p>
-                        </div>
-                        <div style={{
-                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                            borderRadius: 16, padding: 32
-                        }}>
-                            <p style={{
-                                color: "#94a3b8", fontSize: 12, fontWeight: 700, letterSpacing: "0.1em",
-                                marginBottom: 28, marginTop: 0
-                            }}>
-                                CONFIGURAR PARTIDO
-                            </p>
-
-                            <div style={{ marginBottom: 28 }}>
-                                <p style={{
-                                    color: "#94a3b8", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-                                    marginBottom: 12, marginTop: 0
-                                }}>
-                                    JUGADORES
-                                </p>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-                                    <div>
-                                        <p style={{
-                                            color: "#f59e0b", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-                                            marginBottom: 10, marginTop: 0
-                                        }}>
-                                            EQUIPO 1
-                                        </p>
-                                        <input style={{ ...inp, marginBottom: 10 }} placeholder="Jugador 1" value={t1p1} onChange={e => setT1p1(e.target.value)} />
-                                        <input style={inp} placeholder="Jugador 2" value={t1p2} onChange={e => setT1p2(e.target.value)} />
-                                    </div>
-                                    <div>
-                                        <p style={{
-                                            color: "#63b3ed", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-                                            marginBottom: 10, marginTop: 0
-                                        }}>
-                                            EQUIPO 2
-                                        </p>
-                                        <input style={{ ...inp, marginBottom: 10 }} placeholder="Jugador 3" value={t2p1} onChange={e => setT2p1(e.target.value)} />
-                                        <input style={inp} placeholder="Jugador 4" value={t2p2} onChange={e => setT2p2(e.target.value)} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style={{ marginBottom: 28 }}>
-                                <p style={{
-                                    color: "#94a3b8", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-                                    marginBottom: 12, marginTop: 0
-                                }}>
-                                    SACA PRIMERO
-                                </p>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
-                                    {[
-                                        { id: "t1p1", label: t1p1 || "Jug 1" },
-                                        { id: "t1p2", label: t1p2 || "Jug 2" },
-                                        { id: "t2p1", label: t2p1 || "Jug 3" },
-                                        { id: "t2p2", label: t2p2 || "Jug 4" }
-                                    ].map(opt => (
-                                        <button key={opt.id} onClick={() => setServing(opt.id)} style={{
-                                            padding: "10px 8px", borderRadius: 8, border: "1px solid",
-                                            borderColor: serving === opt.id ? "#f59e0b" : "rgba(255,255,255,0.1)",
-                                            background: serving === opt.id ? "rgba(245,158,11,0.15)" : "transparent",
-                                            color: serving === opt.id ? "#f59e0b" : "#94a3b8",
-                                            fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "center"
-                                        }}>
-                                            {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div style={{ marginBottom: 28 }}>
-                                <p style={{
-                                    color: "#94a3b8", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-                                    marginBottom: 12, marginTop: 0
-                                }}>
-                                    NÚMERO DE SETS
-                                </p>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                                    {["1", "3"].map(n => (
-                                        <button key={n} onClick={() => setSets(n)} style={{
-                                            padding: "12px", borderRadius: 8, border: "1px solid",
-                                            borderColor: sets === n ? "#63b3ed" : "rgba(255,255,255,0.1)",
-                                            background: sets === n ? "rgba(99,179,237,0.15)" : "transparent",
-                                            color: sets === n ? "#63b3ed" : "#94a3b8",
-                                            fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit"
-                                        }}>
-                                            {n} Set{n !== "1" ? "s" : ""}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div style={{ marginBottom: 28 }}>
-                                <p style={{
-                                    color: "#94a3b8", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-                                    marginBottom: 12, marginTop: 0
-                                }}>
-                                    REGLA EN 40-40
-                                </p>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                                    {[
-                                        { id: "goldenPoint", label: "Golden Point" },
-                                        { id: "advantage", label: "Advantage" }
-                                    ].map(opt => (
-                                        <button key={opt.id} onClick={() => setDeuceRule(opt.id)} style={{
-                                            padding: "12px", borderRadius: 8, border: "1px solid",
-                                            borderColor: deuceRule === opt.id ? "#22c55e" : "rgba(255,255,255,0.1)",
-                                            background: deuceRule === opt.id ? "rgba(34,197,94,0.15)" : "transparent",
-                                            color: deuceRule === opt.id ? "#22c55e" : "#94a3b8",
-                                            fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "center"
-                                        }}>
-                                            {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <button disabled={!ready} onClick={() => onStart({ t1p1, t1p2, t2p1, t2p2, serving, sets: parseInt(sets), deuceRule })} style={{
-                                width: "100%", padding: "14px", borderRadius: 10, border: "none",
-                                background: ready ? "linear-gradient(135deg, #f59e0b, #ef4444)" : "rgba(255,255,255,0.05)",
-                                color: ready ? "#0a0f1a" : "#475569",
-                                fontSize: 15, fontWeight: 800, cursor: ready ? "pointer" : "not-allowed",
-                                letterSpacing: "0.05em", fontFamily: "inherit"
-                            }}>
-                                INICIAR PARTIDO →
-                            </button>
-                        </div>
-                    </div>
+                  {Math.max(0, sets.filter(s => s.t1 > s.t2).length + scoreModifiers.sets.t1)}
                 </div>
-            );
-        }
+                <div style={{
+                  fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
+                }}>
+                  SETS
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{
+                  fontSize: 28, fontWeight: 900, color: "#f59e0b", lineHeight: 1
+                }}>
+                  {games.t1}
+                </div>
+                <div style={{
+                  fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
+                }}>
+                  GAMES
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{
+                  fontSize: 28, fontWeight: 900,
+                  color: points.t1 === "AD" ? "#22c55e" : "#e2e8f0", lineHeight: 1
+                }}>
+                  {points.t1}
+                </div>
+                <div style={{
+                  fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
+                }}>
+                  PTS
+                </div>
+              </div>
+            </div>
+            <div style={{
+              fontSize: 8, color: "#f59e0b", fontWeight: 700, marginTop: 12,
+              letterSpacing: "0.1em"
+            }}>
+              {isTiebreak ? "🎯 TIE-BREAK" : `SET ${sets.length + 1}`}
+            </div>
+          </div>
 
-        function TrackerScreen({ config, events, onAddEvent, onUndo, onDeleteEvent, onFinish, onSetupBack }) {
-            const [selPlayer, setSelPlayer] = useState(null);
-            const [selShot, setSelShot] = useState(null);
-            const [selResult, setSelResult] = useState(null);
-            const [selVictim, setSelVictim] = useState(null);
-            const [selVictimShot, setSelVictimShot] = useState(null);
-            const [errorMessage, setErrorMessage] = useState(null);
-            const [showHistory, setShowHistory] = useState(false);
-            const [serveFirstPlayers, setServeFirstPlayers] = useState({
-                t1: config.serving.startsWith("t1") ? config.serving : null,
-                t2: null
-            });
-            const [serveSecondPlayers, setServeSecondPlayers] = useState({ t1: null, t2: null });
-            const [secondServer, setSecondServer] = useState(null);
-            const [pendingServeChoice, setPendingServeChoice] = useState(null);
-            const [scoreModifiers, setScoreModifiers] = useState({
-                points: { t1: 0, t2: 0 },
-                games: { t1: 0, t2: 0 },
-                sets: { t1: 0, t2: 0 }
-            });
-            const [tiebreakNotification, setTiebreakNotification] = useState(false);
-            const [prevGamesState, setPrevGamesState] = useState({ t1: 0, t2: 0 });
-            const [serverSequence, setServerSequence] = useState(null);
-            const [setWinner, setSetWinner] = useState(null);
-            const [matchWinner, setMatchWinner] = useState(null);
+          <div style={{
+            width: 1, height: 80, background: "rgba(255,255,255,0.15)"
+          }} />
 
-            const players = useMemo(() => [
-                { id: "t1p1", name: config.t1p1, team: "t1", color: "#f59e0b" },
-                { id: "t1p2", name: config.t1p2, team: "t1", color: "#f59e0b" },
-                { id: "t2p1", name: config.t2p1, team: "t2", color: "#63b3ed" },
-                { id: "t2p2", name: config.t2p2, team: "t2", color: "#63b3ed" },
-            ], [config.t1p1, config.t1p2, config.t2p1, config.t2p2]);
+          <div style={{ textAlign: "center", minWidth: 110 }}>
+            <div style={{
+              fontSize: 9, color: "#63b3ed", fontWeight: 700, letterSpacing: "0.08em",
+              marginBottom: 10
+            }}>
+              {config.t2p1.split(" ")[0].toUpperCase()} / {config.t2p2.split(" ")[0].toUpperCase()}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center" }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{
+                  fontSize: 18, fontWeight: 900, color: "#63b3ed", lineHeight: 1
+                }}>
+                  {Math.max(0, sets.filter(s => s.t2 > s.t1).length + scoreModifiers.sets.t2)}
+                </div>
+                <div style={{
+                  fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
+                }}>
+                  SETS
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{
+                  fontSize: 28, fontWeight: 900, color: "#63b3ed", lineHeight: 1
+                }}>
+                  {games.t2}
+                </div>
+                <div style={{
+                  fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
+                }}>
+                  GAMES
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{
+                  fontSize: 28, fontWeight: 900,
+                  color: points.t2 === "AD" ? "#22c55e" : "#e2e8f0", lineHeight: 1
+                }}>
+                  {points.t2}
+                </div>
+                <div style={{
+                  fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
+                }}>
+                  PTS
+                </div>
+              </div>
+            </div>
+            <div style={{
+              fontSize: 8, color: "#63b3ed", fontWeight: 700, marginTop: 12,
+              letterSpacing: "0.1em"
+            }}>
+              {deuceState ? deuceState : `SET ${sets.length + 1}`}
+            </div>
+          </div>
+        </div>
 
-            const getServerForGame = useCallback((gameNumber) => {
-                if (!secondServer) return config.serving;
-                
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          <button onClick={onUndo} style={{ ...btn, padding: "7px 12px", fontSize: 12 }}>↩</button>
+          <button onClick={onFinish} style={{
+            ...btn, padding: "7px 12px", fontSize: 12,
+            background: "rgba(239,68,68,0.1)", color: "#ef4444", borderColor: "rgba(239,68,68,0.3)"
+          }}>
+            Stats →
+          </button>
+        </div>
+      </div>
+
+      <div style={{
+        height: "calc(100vh - 57px)", overflowY: "auto", padding: 16,
+        display: "flex", flexDirection: "column", gap: 18
+      }}>
+
+        <div style={{
+          background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)",
+          borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8
+        }}>
+          <span style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, letterSpacing: "0.06em" }}>
+            SACA:
+          </span>
+          <span style={{ fontSize: 13, color: "#fcd34d", fontWeight: 600 }}>
+            {(() => {
+              const totalCompletedGames = games.t1 + games.t2 + scoreModifiers.games.t1 + scoreModifiers.games.t2;
+              
+              // If sequence is ready, use it
+              if (serverSequence && serverSequence.length === 4) {
+                const index = totalCompletedGames % 4;
+                const serverId = serverSequence[index];
+                const name = players.find(p => p.id === serverId)?.name;
+                console.log(`✅ [SACA] Using SEQUENCE: totalGames=${totalCompletedGames}, index=${index}, server=${name}`);
+                return name || "?";
+              }
+              
+              // If second server not chosen yet, always show first server
+              if (!secondServer) {
+                const firstServerName = players.find(p => p.id === config.serving)?.name;
+                console.log(`📋 [SACA] Waiting for second server, showing first: ${firstServerName}`);
+                return firstServerName || "?";
+              }
+              
+              // If we're here: secondServer exists but serverSequence doesn't
+              // Build a temporary sequence to maintain proper order
+              if (secondServer && players.length === 4) {
                 const firstServer = config.serving;
                 const firstServerPlayer = players.find(p => p.id === firstServer);
                 const secondServerPlayer = players.find(p => p.id === secondServer);
                 
-                if (!firstServerPlayer || !secondServerPlayer) return firstServer;
-                
-                const firstServerTeam = firstServerPlayer.team;
-                const secondServerTeam = secondServerPlayer.team;
-                
-                const firstServerPartner = players.find(p => p.team === firstServerTeam && p.id !== firstServer);
-                const secondServerPartner = players.find(p => p.team === secondServerTeam && p.id !== secondServer);
-                
-                if (!firstServerPartner || !secondServerPartner) return firstServer;
-                
-                const sequence = [firstServer, secondServer, firstServerPartner.id, secondServerPartner.id];
-                const index = (gameNumber - 1) % 4;
-                return sequence[index];
-            }, [config.serving, secondServer, players]);
-
-            const currentPlayer = players.find(p => p.id === selPlayer);
-            const resultObj = RESULTS.find(r => r.id === selResult);
-            const isForced = resultObj?.type === "forced";
-            const canRegister = selPlayer && selShot && selResult && (!isForced || (selVictim && selVictimShot));
-
-            useEffect(() => {
-                if (canRegister && selResult) {
-                    const timer = setTimeout(() => {
-                        handleRegister();
-                    }, 50);
-                    return () => clearTimeout(timer);
+                if (firstServerPlayer && secondServerPlayer) {
+                  const firstServerTeam = firstServerPlayer.team;
+                  const secondServerTeam = secondServerPlayer.team;
+                  const firstServerPartner = players.find(p => p.team === firstServerTeam && p.id !== firstServer);
+                  const secondServerPartner = players.find(p => p.team === secondServerTeam && p.id !== secondServer);
+                  
+                  if (firstServerPartner && secondServerPartner) {
+                    const tempSequence = [firstServer, secondServer, firstServerPartner.id, secondServerPartner.id];
+                    const index = totalCompletedGames % 4;
+                    const serverId = tempSequence[index];
+                    const name = players.find(p => p.id === serverId)?.name;
+                    console.log(`⚠️ [SACA] Using TEMPORARY sequence: ${tempSequence.map(s => players.find(p => p.id === s)?.name).join(' → ')}, index=${index}, server=${name}`);
+                    return name || "?";
+                  }
                 }
-            }, [selResult, canRegister]);
+              }
+              
+              console.error(`❌ [SACA] Cannot determine server!`);
+              return "?";
+            })()}
+          </span>
+          <span style={{ fontSize: 20, marginLeft: "auto" }}>🎾</span>
+        </div>
 
-            function handleRegister() {
-                if (!canRegister) return;
-                
-                const shotObj = SHOT_TYPES.find(s => s.id === selShot);
-                const isServeShot = shotObj?.group === "Saque";
-                const isWinOrErrNF = selResult === "Win" || selResult === "ErrNF";
-                const currentServerName = players.find(p => p.id === currentServer)?.name;
-                
-                if (isServeShot && isWinOrErrNF && selPlayer !== currentServer) {
-                    setErrorMessage(`⚠️ Solo el jugador que está sirviendo puede ganar o cometer error en el servicio.\n\nActualmente está sirviendo: ${currentServerName}`);
-                    return;
-                }
-                
-                const victimShotObj = selVictimShot ? SHOT_TYPES.find(s => s.id === selVictimShot) : null;
-                onAddEvent({
-                    player: selPlayer, playerName: currentPlayer.name, team: currentPlayer.team,
-                    shot: selShot, shotLabel: shotObj?.label,
-                    result: selResult, resultLabel: resultObj?.label, resultType: resultObj?.type,
-                    victim: isForced ? selVictim : null,
-                    victimName: isForced ? players.find(p => p.id === selVictim)?.name : null,
-                    victimShot: isForced ? selVictimShot : null,
-                    victimShotLabel: isForced ? victimShotObj?.label : null,
-                    isServe: shotObj?.group === "Saque",
-                });
-                setSelShot(null);
-                setSelResult(null);
-                setSelVictim(null);
-                setSelVictimShot(null);
-            }
-
-            useEffect(() => {
-                setScoreModifiers(prev => ({
-                    points: { t1: 0, t2: 0 },
-                    games: prev.games,
-                    sets: { t1: 0, t2: 0 }
-                }));
-            }, [events.length]);
-
-            const lastServersFromEvents = useMemo(() => {
-                const last = { t1: config.serving, t2: null };
-                events.forEach(ev => {
-                    if (ev.isServe) {
-                        last[ev.team] = ev.player;
-                    }
-                });
-                return last;
-            }, [events, config.serving]);
-
-            const { sets, games, points, currentServer, deuceState, isTiebreak } = useMemo(
-                () => calculateScore(events, config, players, serveFirstPlayers, lastServersFromEvents, scoreModifiers.games, scoreModifiers.points, serveSecondPlayers, secondServer, getServerForGame),
-                [events, config, players, serveFirstPlayers, lastServersFromEvents, scoreModifiers.games, scoreModifiers.points, serveSecondPlayers, secondServer, getServerForGame]
-            );
-
-            useEffect(() => {
-                if (secondServer && players.length === 4) {
-                    const firstServer = config.serving;
-                    const firstServerPlayer = players.find(p => p.id === firstServer);
-                    const secondServerPlayer = players.find(p => p.id === secondServer);
-                    
-                    if (!firstServerPlayer || !secondServerPlayer) return;
-                    
-                    const firstServerTeam = firstServerPlayer.team;
-                    const secondServerTeam = secondServerPlayer.team;
-                    
-                    const firstServerPartner = players.find(p => p.team === firstServerTeam && p.id !== firstServer);
-                    const secondServerPartner = players.find(p => p.team === secondServerTeam && p.id !== secondServer);
-                    
-                    if (!firstServerPartner || !secondServerPartner) return;
-                    
-                    const sequence = [firstServer, secondServer, firstServerPartner.id, secondServerPartner.id];
-                    setServerSequence(sequence);
-                }
-            }, [secondServer, config.serving, players]);
-
-            const prevSetsLengthRef = useRef(0);
-            useEffect(() => {
-                if (sets.length > prevSetsLengthRef.current) {
-                    const lastSet = sets[sets.length - 1];
-                    const t1SetsWon = sets.filter(s => s.t1 > s.t2).length + scoreModifiers.sets.t1;
-                    const t2SetsWon = sets.filter(s => s.t2 > s.t1).length + scoreModifiers.sets.t2;
-                    
-                    if (lastSet.t1 > lastSet.t2) {
-                        setSetWinner("t1");
-                        if (t1SetsWon >= parseInt(config.sets)) setMatchWinner("t1");
-                    } else if (lastSet.t2 > lastSet.t1) {
-                        setSetWinner("t2");
-                        if (t2SetsWon >= parseInt(config.sets)) setMatchWinner("t2");
-                    }
-                }
-                prevSetsLengthRef.current = sets.length;
-            }, [sets, scoreModifiers.sets, config.sets]);
-
-            const prevGamesRef = useRef(null);
-            useEffect(() => {
-                const is66Now = games.t1 === 6 && games.t2 === 6;
-                const was66Before = prevGamesRef.current && prevGamesRef.current.t1 === 6 && prevGamesRef.current.t2 === 6;
-                
-                if (is66Now && !was66Before && !tiebreakNotification) {
-                    setTiebreakNotification(true);
-                }
-                
-                prevGamesRef.current = { t1: games.t1, t2: games.t2 };
-            }, [games, isTiebreak]);
-
-            const btn = {
-                borderRadius: 7, border: "1px solid rgba(255,255,255,0.08)",
-                background: "rgba(255,255,255,0.04)", color: "#94a3b8", fontSize: 12,
-                fontWeight: 700, cursor: "pointer", padding: "8px 6px", fontFamily: "inherit",
-                letterSpacing: "0.03em"
-            };
-
-            const sel = (active, color = "#f59e0b") => active ? {
-                borderColor: color, background: color + "22", color
-            } : {};
-
-            return (
-                <div style={{
-                    minHeight: "100vh", background: "#0a0f1a", fontFamily: "'Outfit', sans-serif",
-                    color: "#f1f5f9", overflow: "hidden"
-                }}>
-                    <div style={{
-                        background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.06)",
-                        padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between",
-                        gap: 8, flexWrap: "wrap"
-                    }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <button onClick={onSetupBack} style={{
-                                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
-                                borderRadius: 6, color: "#e2e8f0", cursor: "pointer", fontSize: 12, padding: "6px 10px",
-                                fontFamily: "inherit", fontWeight: 600
-                            }}>
-                                ← Setup
-                            </button>
-                            <span style={{ fontSize: 14, fontWeight: 900, letterSpacing: "-0.02em" }}>
-                                PÁDEL<span style={{ color: "#f59e0b" }}>TRACK</span>
-                            </span>
-                        </div>
-
-                        <div style={{
-                            display: "flex", alignItems: "center", gap: 20, padding: "10px 16px",
-                            background: "rgba(255,255,255,0.05)", borderRadius: 10,
-                            border: "1px solid rgba(255,255,255,0.1)"
-                        }}>
-                            <div style={{ textAlign: "center", minWidth: 110 }}>
-                                <div style={{
-                                    fontSize: 9, color: "#f59e0b", fontWeight: 700, letterSpacing: "0.08em",
-                                    marginBottom: 10
-                                }}>
-                                    {config.t1p1.split(" ")[0].toUpperCase()} / {config.t1p2.split(" ")[0].toUpperCase()}
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center" }}>
-                                    <div style={{ textAlign: "center" }}>
-                                        <div style={{
-                                            fontSize: 18, fontWeight: 900, color: "#f59e0b", lineHeight: 1
-                                        }}>
-                                            {Math.max(0, sets.filter(s => s.t1 > s.t2).length + scoreModifiers.sets.t1)}
-                                        </div>
-                                        <div style={{
-                                            fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
-                                        }}>
-                                            SETS
-                                        </div>
-                                    </div>
-                                    <div style={{ textAlign: "center" }}>
-                                        <div style={{
-                                            fontSize: 28, fontWeight: 900, color: "#f59e0b", lineHeight: 1
-                                        }}>
-                                            {games.t1}
-                                        </div>
-                                        <div style={{
-                                            fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
-                                        }}>
-                                            GAMES
-                                        </div>
-                                    </div>
-                                    <div style={{ textAlign: "center" }}>
-                                        <div style={{
-                                            fontSize: 28, fontWeight: 900,
-                                            color: points.t1 === "AD" ? "#22c55e" : "#e2e8f0", lineHeight: 1
-                                        }}>
-                                            {points.t1}
-                                        </div>
-                                        <div style={{
-                                            fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
-                                        }}>
-                                            PTS
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style={{
-                                    fontSize: 8, color: "#f59e0b", fontWeight: 700, marginTop: 12,
-                                    letterSpacing: "0.1em"
-                                }}>
-                                    {isTiebreak ? "🎯 TIE-BREAK" : `SET ${sets.length + 1}`}
-                                </div>
-                            </div>
-
-                            <div style={{
-                                width: 1, height: 80, background: "rgba(255,255,255,0.15)"
-                            }} />
-
-                            <div style={{ textAlign: "center", minWidth: 110 }}>
-                                <div style={{
-                                    fontSize: 9, color: "#63b3ed", fontWeight: 700, letterSpacing: "0.08em",
-                                    marginBottom: 10
-                                }}>
-                                    {config.t2p1.split(" ")[0].toUpperCase()} / {config.t2p2.split(" ")[0].toUpperCase()}
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center" }}>
-                                    <div style={{ textAlign: "center" }}>
-                                        <div style={{
-                                            fontSize: 18, fontWeight: 900, color: "#63b3ed", lineHeight: 1
-                                        }}>
-                                            {Math.max(0, sets.filter(s => s.t2 > s.t1).length + scoreModifiers.sets.t2)}
-                                        </div>
-                                        <div style={{
-                                            fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
-                                        }}>
-                                            SETS
-                                        </div>
-                                    </div>
-                                    <div style={{ textAlign: "center" }}>
-                                        <div style={{
-                                            fontSize: 28, fontWeight: 900, color: "#63b3ed", lineHeight: 1
-                                        }}>
-                                            {games.t2}
-                                        </div>
-                                        <div style={{
-                                            fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
-                                        }}>
-                                            GAMES
-                                        </div>
-                                    </div>
-                                    <div style={{ textAlign: "center" }}>
-                                        <div style={{
-                                            fontSize: 28, fontWeight: 900,
-                                            color: points.t2 === "AD" ? "#22c55e" : "#e2e8f0", lineHeight: 1
-                                        }}>
-                                            {points.t2}
-                                        </div>
-                                        <div style={{
-                                            fontSize: 7, color: "#64748b", fontWeight: 800, marginTop: 4, letterSpacing: "0.1em"
-                                        }}>
-                                            PTS
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style={{
-                                    fontSize: 8, color: "#63b3ed", fontWeight: 700, marginTop: 12,
-                                    letterSpacing: "0.1em"
-                                }}>
-                                    {deuceState ? deuceState : `SET ${sets.length + 1}`}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                            <button onClick={onUndo} style={{ ...btn, padding: "7px 12px", fontSize: 12 }}>↩</button>
-                            <button onClick={onFinish} style={{
-                                ...btn, padding: "7px 12px", fontSize: 12,
-                                background: "rgba(239,68,68,0.1)", color: "#ef4444", borderColor: "rgba(239,68,68,0.3)"
-                            }}>
-                                Stats →
-                            </button>
-                        </div>
-                    </div>
-
-                    <div style={{
-                        height: "calc(100vh - 57px)", overflowY: "auto", padding: 16,
-                        display: "flex", flexDirection: "column", gap: 18
-                    }}>
-
-                        <div style={{
-                            background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)",
-                            borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8
-                        }}>
-                            <span style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, letterSpacing: "0.06em" }}>
-                                SACA:
-                            </span>
-                            <span style={{ fontSize: 13, color: "#fcd34d", fontWeight: 600 }}>
-                                {(() => {
-                                    const totalCompletedGames = games.t1 + games.t2 + scoreModifiers.games.t1 + scoreModifiers.games.t2;
-                                    if (serverSequence && serverSequence.length === 4) {
-                                        const index = totalCompletedGames % 4;
-                                        const serverId = serverSequence[index];
-                                        return players.find(p => p.id === serverId)?.name || "?";
-                                    }
-                                    if (!secondServer) {
-                                        return players.find(p => p.id === config.serving)?.name || "?";
-                                    }
-                                    if (secondServer && players.length === 4) {
-                                        const firstServer = config.serving;
-                                        const firstServerPlayer = players.find(p => p.id === firstServer);
-                                        const secondServerPlayer = players.find(p => p.id === secondServer);
-                                        if (firstServerPlayer && secondServerPlayer) {
-                                            const firstServerTeam = firstServerPlayer.team;
-                                            const secondServerTeam = secondServerPlayer.team;
-                                            const firstServerPartner = players.find(p => p.team === firstServerTeam && p.id !== firstServer);
-                                            const secondServerPartner = players.find(p => p.team === secondServerTeam && p.id !== secondServer);
-                                            if (firstServerPartner && secondServerPartner) {
-                                                const tempSequence = [firstServer, secondServer, firstServerPartner.id, secondServerPartner.id];
-                                                const index = totalCompletedGames % 4;
-                                                const serverId = tempSequence[index];
-                                                return players.find(p => p.id === serverId)?.name || "?";
-                                            }
-                                        }
-                                    }
-                                    return "?";
-                                })()}
-                            </span>
-                            <span style={{ fontSize: 20, marginLeft: "auto" }}>🎾</span>
-                        </div>
-
-                        <div>
-                            <p style={{
-                                color: "#94a3b8", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
-                                marginBottom: 8, marginTop: 0
-                            }}>
-                                1 · JUGADOR QUE GOLPEA
-                            </p>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 7 }}>
-                                {players.map(p => (
-                                    <button key={p.id} onClick={() => setSelPlayer(p.id)} style={{
-                                        ...btn, padding: "10px 6px", ...sel(selPlayer === p.id, p.color)
-                                    }}>
-                                        <div style={{ fontSize: 10, fontWeight: 800, marginBottom: 2 }}>
-                                            {p.team === "t1" ? "E1" : "E2"}
-                                        </div>
-                                        <div style={{
-                                            fontSize: 12, fontWeight: 700,
-                                            color: selPlayer === p.id ? p.color : "#e2e8f0"
-                                        }}>
-                                            {p.name.split(" ")[0]}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <p style={{
-                                color: "#94a3b8", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
-                                marginBottom: 8, marginTop: 0
-                            }}>
-                                2 · TIPO DE GOLPE
-                            </p>
-                            {SHOT_GROUPS.map(group => (
-                                <div key={group} style={{ marginBottom: 9 }}>
-                                    <div style={{
-                                        fontSize: 9, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", marginBottom: 5
-                                    }}>
-                                        {group.toUpperCase()}
-                                    </div>
-                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                                        {SHOT_TYPES.filter(s => s.group === group).map(shot => (
-                                            <button key={shot.id} onClick={() => setSelShot(shot.id)} style={{
-                                                ...btn, padding: "6px 11px", ...sel(selShot === shot.id, "#63b3ed")
-                                            }}>
-                                                {shot.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div>
-                            <p style={{
-                                color: "#94a3b8", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
-                                marginBottom: 8, marginTop: 0
-                            }}>
-                                3 · RESULTADO
-                            </p>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-                                {RESULTS.map(r => (
-                                    <button key={r.id} onClick={() => { setSelResult(r.id); setSelVictim(null); }} style={{
-                                        ...btn, padding: "8px 14px",
-                                        borderColor: selResult === r.id ? r.color : "rgba(255,255,255,0.08)",
-                                        background: selResult === r.id ? r.color + "22" : "rgba(255,255,255,0.04)",
-                                        color: selResult === r.id ? r.color : "#94a3b8"
-                                    }}>
-                                        {r.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <button disabled={!canRegister} onClick={handleRegister} style={{
-                            padding: "15px", borderRadius: 10, border: "none",
-                            background: canRegister ? "linear-gradient(135deg, #f59e0b, #ef4444)" : "rgba(255,255,255,0.05)",
-                            color: canRegister ? "#0a0f1a" : "#475569",
-                            fontSize: 14, fontWeight: 800, cursor: canRegister ? "pointer" : "not-allowed",
-                            letterSpacing: "0.05em", fontFamily: "inherit"
-                        }}>
-                            {canRegister ? "✓ REGISTRAR JUGADA" : "Selecciona jugador · golpe · resultado"}
-                        </button>
-
-                        <div style={{ height: 80 }} />
-                    </div>
-
-                    <button onClick={() => setShowHistory(!showHistory)} style={{
-                        position: "fixed", bottom: 20, left: 20, zIndex: 90,
-                        background: "#0d1526", border: "1px solid rgba(255,255,255,0.15)",
-                        borderRadius: 28, color: "#94a3b8", cursor: "pointer",
-                        padding: "11px 18px", fontSize: 12, fontWeight: 700,
-                        fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8,
-                        boxShadow: "0 4px 24px rgba(0,0,0,0.6)", letterSpacing: "0.06em"
-                    }}>
-                        📋
-                        {events.length > 0 && (
-                            <span style={{
-                                background: "#f59e0b", color: "#0a0f1a", borderRadius: 10,
-                                padding: "1px 8px", fontSize: 11, fontWeight: 900
-                            }}>
-                                {events.length}
-                            </span>
-                        )}
-                    </button>
-
-                    {tiebreakNotification && (
-                        <>
-                            <div onClick={() => setTiebreakNotification(false)} style={{
-                                position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.7)",
-                                backdropFilter: "blur(4px)"
-                            }} />
-                            <div style={{
-                                position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-                                zIndex: 301, background: "#0d1526", borderRadius: 16,
-                                border: "1px solid rgba(34,197,94,0.3)", padding: 28,
-                                maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.8)"
-                            }}>
-                                <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
-                                    <span style={{ fontSize: 28 }}>🎯</span>
-                                    <div style={{ flex: 1 }}>
-                                        <p style={{
-                                            fontSize: 15, fontWeight: 800, color: "#f1f5f9", marginBottom: 8, marginTop: 0,
-                                            letterSpacing: "-0.01em"
-                                        }}>
-                                            ¡TIE-BREAK!
-                                        </p>
-                                        <p style={{
-                                            fontSize: 13, color: "#cbd5e1", marginBottom: 0, marginTop: 0,
-                                            lineHeight: "1.5"
-                                        }}>
-                                            Se alcanzó 6-6 en los juegos. El primero que llegue a 7 puntos (con 2 de ventaja) gana el set.
-                                        </p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setTiebreakNotification(false)} style={{
-                                    width: "100%", padding: "12px", borderRadius: 10, border: "none",
-                                    background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 700,
-                                    cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s"
-                                }}>
-                                    OK
-                                </button>
-                            </div>
-                        </>
-                    )}
-
-                    {setWinner && (
-                        <>
-                            <div onClick={() => setSetWinner(null)} style={{
-                                position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.7)",
-                                backdropFilter: "blur(4px)"
-                            }} />
-                            <div style={{
-                                position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-                                zIndex: 401, background: "#0d1526", borderRadius: 16,
-                                border: "1px solid rgba(34,197,94,0.3)", padding: 28,
-                                maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.8)"
-                            }}>
-                                <div style={{ display: "flex", alignItems: "center", flexDirection: "column", gap: 20, marginBottom: 20 }}>
-                                    <span style={{ fontSize: 60 }}>🏆</span>
-                                    <p style={{
-                                        fontSize: 18, fontWeight: 900, color: "#22c55e", marginBottom: 8, marginTop: 0,
-                                        letterSpacing: "-0.01em", textAlign: "center"
-                                    }}>
-                                        ¡SET GANADO!
-                                    </p>
-                                    <p style={{
-                                        fontSize: 24, fontWeight: 900, color: setWinner === "t1" ? "#f59e0b" : "#63b3ed", marginBottom: 0, marginTop: 0,
-                                        textAlign: "center"
-                                    }}>
-                                        {setWinner === "t1" ? `${config.t1p1} y ${config.t1p2}` : `${config.t2p1} y ${config.t2p2}`}
-                                    </p>
-                                </div>
-                                <button onClick={() => setSetWinner(null)} style={{
-                                    width: "100%", padding: "14px", borderRadius: 10, border: "none",
-                                    background: "linear-gradient(135deg, #22c55e, #16a34a)", color: "#fff", fontSize: 15, fontWeight: 800,
-                                    cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s"
-                                }}>
-                                    ✓ CAPITO
-                                </button>
-                            </div>
-                        </>
-                    )}
-
-                    {matchWinner && (
-                        <>
-                            <div onClick={() => setMatchWinner(null)} style={{
-                                position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.8)",
-                                backdropFilter: "blur(4px)"
-                            }} />
-                            <div style={{
-                                position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-                                zIndex: 501, background: "linear-gradient(135deg, #0d1526, #1a2332)", borderRadius: 16,
-                                border: "2px solid #22c55e", padding: 40,
-                                maxWidth: 480, boxShadow: "0 20px 80px rgba(34,197,94,0.4)"
-                            }}>
-                                <div style={{ display: "flex", alignItems: "center", flexDirection: "column", gap: 24, marginBottom: 24 }}>
-                                    <span style={{ fontSize: 80 }}>🎉</span>
-                                    <p style={{
-                                        fontSize: 20, fontWeight: 900, color: "#22c55e", marginBottom: 8, marginTop: 0,
-                                        letterSpacing: "-0.01em", textAlign: "center"
-                                    }}>
-                                        ¡PARTIDA GANADA!
-                                    </p>
-                                    <p style={{
-                                        fontSize: 28, fontWeight: 900, color: matchWinner === "t1" ? "#f59e0b" : "#63b3ed", marginBottom: 0, marginTop: 0,
-                                        textAlign: "center"
-                                    }}>
-                                        {matchWinner === "t1" ? `${config.t1p1} y ${config.t1p2}` : `${config.t2p1} y ${config.t2p2}`}
-                                    </p>
-                                </div>
-                                <button onClick={() => setMatchWinner(null)} style={{
-                                    width: "100%", padding: "16px", borderRadius: 10, border: "none",
-                                    background: "linear-gradient(135deg, #22c55e, #16a34a)", color: "#fff", fontSize: 16, fontWeight: 800,
-                                    cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s"
-                                }}>
-                                    ✓ ENTENDIDO
-                                </button>
-                            </div>
-                        </>
-                    )}
+        <div>
+          <p style={{
+            color: "#94a3b8", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+            marginBottom: 8, marginTop: 0
+          }}>
+            1 · JUGADOR QUE GOLPEA
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 7 }}>
+            {players.map(p => (
+              <button key={p.id} onClick={() => setSelPlayer(p.id)} style={{
+                ...btn, padding: "10px 6px", ...sel(selPlayer === p.id, p.color)
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 800, marginBottom: 2 }}>
+                  {p.team === "t1" ? "E1" : "E2"}
                 </div>
-            );
-        }
+                <div style={{
+                  fontSize: 12, fontWeight: 700,
+                  color: selPlayer === p.id ? p.color : "#e2e8f0"
+                }}>
+                  {p.name.split(" ")[0]}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
 
-        function calculateScore(events, config, players, serveFirstPlayers = {}, lastServers = {}, gamesModifier = { t1: 0, t2: 0 }, pointsModifier = { t1: 0, t2: 0 }, serveSecondPlayers = { t1: null, t2: null }, secondServer = null, getServerForGame = null) {
-            const sets = [];
-            
-            let games = { 
-                t1: Math.max(0, gamesModifier.t1),
-                t2: Math.max(0, gamesModifier.t2)
-            };
-            
-            const SCORE_SEQ = ["0", "15", "30", "40"];
-            const getPointsFromModifier = (modifier) => {
-                if (modifier >= 4) return "AD";
-                return SCORE_SEQ[Math.min(3, Math.max(0, modifier))];
-            };
-            
-            let points = { 
-                t1: getPointsFromModifier(pointsModifier.t1), 
-                t2: getPointsFromModifier(pointsModifier.t2) 
-            };
-            let currentServer = config.serving;
-            let deuceState = null;
-            let isTiebreak = false;
+        <div>
+          <p style={{
+            color: "#94a3b8", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+            marginBottom: 8, marginTop: 0
+          }}>
+            2 · TIPO DE GOLPE
+          </p>
+          {SHOT_GROUPS.map(group => (
+            <div key={group} style={{ marginBottom: 9 }}>
+              <div style={{
+                fontSize: 9, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", marginBottom: 5
+              }}>
+                {group.toUpperCase()}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                {SHOT_TYPES.filter(s => s.group === group).map(shot => (
+                  <button key={shot.id} onClick={() => setSelShot(shot.id)} style={{
+                    ...btn, padding: "6px 11px", ...sel(selShot === shot.id, "#63b3ed")
+                  }}>
+                    {shot.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
 
-            function getNextServer() {
-                if (secondServer && getServerForGame) {
-                    const gameCount = games.t1 + games.t2 + 1;
-                    return getServerForGame(gameCount);
-                }
-                
-                const currentTeam = players.find(p => p.id === currentServer)?.team;
-                const otherTeam = currentTeam === "t1" ? "t2" : "t1";
-                
-                const lastServer = lastServers[otherTeam];
-                
-                if (!lastServer) {
-                    return serveFirstPlayers[otherTeam] || players.find(p => p.team === otherTeam)?.id;
-                }
+        <div>
+          <p style={{
+            color: "#94a3b8", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+            marginBottom: 8, marginTop: 0
+          }}>
+            3 · RESULTADO
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+            {RESULTS.map(r => (
+              <button key={r.id} onClick={() => { setSelResult(r.id); setSelVictim(null); }} style={{
+                ...btn, padding: "8px 14px",
+                borderColor: selResult === r.id ? r.color : "rgba(255,255,255,0.08)",
+                background: selResult === r.id ? r.color + "22" : "rgba(255,255,255,0.04)",
+                color: selResult === r.id ? r.color : "#94a3b8"
+              }}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-                if (lastServer === serveFirstPlayers[otherTeam]) {
-                    return serveSecondPlayers[otherTeam] || players.filter(p => p.team === otherTeam).find(p => p.id !== serveFirstPlayers[otherTeam])?.id;
-                }
-                
-                return serveFirstPlayers[otherTeam] || players.find(p => p.team === otherTeam)?.id;
-            }
+        {isForced && (
+          <div>
+            <p style={{
+              color: "#f97316", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+              marginBottom: 8, marginTop: 0
+            }}>
+              4 · VÍCTIMA DEL ERROR FORZADO
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 7 }}>
+              {players.filter(p => p.id !== selPlayer).map(p => (
+                <button key={p.id} onClick={() => { setSelVictim(p.id); setSelVictimShot(null); }} style={{
+                  ...btn, padding: "9px 6px", ...sel(selVictim === p.id, "#f97316")
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{p.name.split(" ")[0]}</div>
+                </button>
+              ))}
+            </div>
 
-            function getNextServerInTiebreak() {
-                const totalPoints = parseInt(points.t1) + parseInt(points.t2);
-                
-                const currentServerPlayer = players.find(p => p.id === currentServer);
-                const currentTeam = currentServerPlayer?.team;
-                const otherTeam = currentTeam === "t1" ? "t2" : "t1";
-                
-                const currentPartner = players.find(p => p.team === currentTeam && p.id !== currentServer)?.id;
-                
-                const otherTeamFirstServer = serveFirstPlayers[otherTeam] || players.find(p => p.team === otherTeam)?.id;
-                
-                const otherTeamPartner = players.find(p => p.team === otherTeam && p.id !== otherTeamFirstServer)?.id;
-                
-                const serverSequence = [currentServer, currentPartner, otherTeamFirstServer, otherTeamPartner];
-                
-                const sequenceIndex = Math.floor((totalPoints + 1) / 2) % 4;
-                return serverSequence[sequenceIndex];
-            }
+            {selVictim && (
+              <div style={{ marginTop: 16 }}>
+                <p style={{
+                  color: "#f97316", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+                  marginBottom: 8, marginTop: 0
+                }}>
+                  5 · TIPO DI COLPO DELLA VITTIMA
+                </p>
+                {SHOT_GROUPS.map(group => (
+                  <div key={group} style={{ marginBottom: 9 }}>
+                    <div style={{
+                      fontSize: 9, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", marginBottom: 5
+                    }}>
+                      {group.toUpperCase()}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                      {SHOT_TYPES.filter(s => s.group === group).map(shot => (
+                        <button key={shot.id} onClick={() => setSelVictimShot(shot.id)} style={{
+                          ...btn, padding: "6px 11px", ...sel(selVictimShot === shot.id, "#f97316")
+                        }}>
+                          {shot.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            events.forEach((ev) => {
-                const isPoint = ["Win", "ErrF", "FzaErr", "ErrNF"].includes(ev.result);
-                if (!isPoint) return;
+            {selVictim && selVictimShot && (
+              <div style={{ marginTop: 16 }}>
+                <p style={{
+                  color: "#f97316", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+                  marginBottom: 8, marginTop: 0
+                }}>
+                  6 · RISULTATO
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                  <button style={{
+                    ...btn, padding: "8px 14px",
+                    borderColor: "#f97316", background: "#f97316" + "22", color: "#f97316"
+                  }}>
+                    Err F
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
-                if (ev.shot === "S1" && ev.result === "ErrNF") {
-                    return;
-                }
+        <button disabled={!canRegister} onClick={handleRegister} style={{
+          padding: "15px", borderRadius: 10, border: "none",
+          background: canRegister ? "linear-gradient(135deg, #f59e0b, #ef4444)" : "rgba(255,255,255,0.05)",
+          color: canRegister ? "#0a0f1a" : "#475569",
+          fontSize: 14, fontWeight: 800, cursor: canRegister ? "pointer" : "not-allowed",
+          letterSpacing: "0.05em", fontFamily: "inherit"
+        }}>
+          {canRegister ? "✓ REGISTRAR JUGADA" : 
+            isForced && selVictim && !selVictimShot ? "Selecciona tipo de colpo víctima" :
+            isForced && selVictim ? "Selecciona tipo de colpo víctima" :
+            isForced ? "Selecciona víctima" :
+            "Selecciona jugador · golpe · resultado"}
+        </button>
 
-                const scored = ["Win", "FzaErr"].includes(ev.result) ? ev.team : (ev.team === "t1" ? "t2" : "t1");
-                const conceded = scored === "t1" ? "t2" : "t1";
+        <div style={{ height: 80 }} />
+      </div>
 
-                if (games.t1 === 6 && games.t2 === 6) {
-                    isTiebreak = true;
-                    if (points.t1 !== "0" || points.t2 !== "0") {
-                        points = { t1: "0", t2: "0" };
-                    }
-                }
+      <button onClick={() => setShowHistory(!showHistory)} style={{
+        position: "fixed", bottom: 20, left: 20, zIndex: 90,
+        background: "#0d1526", border: "1px solid rgba(255,255,255,0.15)",
+        borderRadius: 28, color: "#94a3b8", cursor: "pointer",
+        padding: "11px 18px", fontSize: 12, fontWeight: 700,
+        fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8,
+        boxShadow: "0 4px 24px rgba(0,0,0,0.6)", letterSpacing: "0.06em"
+      }}>
+        📋
+        {events.length > 0 && (
+          <span style={{
+            background: "#f59e0b", color: "#0a0f1a", borderRadius: 10,
+            padding: "1px 8px", fontSize: 11, fontWeight: 900
+          }}>
+            {events.length}
+          </span>
+        )}
+      </button>
 
-                if (isTiebreak) {
-                    const p1 = parseInt(points.t1) || 0;
-                    const p2 = parseInt(points.t2) || 0;
-                    
-                    if (scored === "t1") {
-                        points.t1 = String(p1 + 1);
-                    } else {
-                        points.t2 = String(p2 + 1);
-                    }
-                    
-                    const newP1 = parseInt(points.t1);
-                    const newP2 = parseInt(points.t2);
-                    
-                    currentServer = getNextServerInTiebreak();
-                    
-                    if ((newP1 >= 7 || newP2 >= 7) && Math.abs(newP1 - newP2) >= 2) {
-                        games[scored]++;
-                        sets.push({ t1: games.t1, t2: games.t2 });
-                        games = { t1: 0, t2: 0 };
-                        points = { t1: "0", t2: "0" };
-                        isTiebreak = false;
-                        deuceState = null;
-                        currentServer = getNextServer();
-                    }
-                    return;
-                }
+      {showHistory && (
+        <>
+          <div onClick={() => setShowHistory(false)} style={{
+            position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(3px)"
+          }} />
+          <div style={{
+            position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 101,
+            width: Math.min(360, window.innerWidth * 0.85),
+            background: "#0d1526", borderRight: "1px solid rgba(255,255,255,0.1)",
+            display: "flex", flexDirection: "column",
+            boxShadow: "12px 0 40px rgba(0,0,0,0.7)"
+          }}>
+            <div style={{
+              padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)",
+              display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0
+            }}>
+              <span style={{
+                color: "#94a3b8", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em"
+              }}>
+                HISTORIAL ({events.length})
+              </span>
+              <button onClick={() => setShowHistory(false)} style={{
+                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 6, color: "#e2e8f0", cursor: "pointer", fontSize: 16,
+                width: 30, height: 30, display: "flex", alignItems: "center",
+                justifyContent: "center", fontFamily: "inherit"
+              }}>
+                ✕
+              </button>
+            </div>
 
-                if (points[scored] === "40" && points[conceded] === "AD") {
-                    points[conceded] = "40";
-                } else if (points[scored] === "AD") {
-                    games[scored]++;
-                    points = { t1: "0", t2: "0" };
-                    deuceState = null;
-
-                    const shouldEndSet = (games[scored] >= 6 && games[conceded] <= 4) || (games[scored] >= 7 && games[scored] - games[conceded] >= 2);
-                    const isSixSix = games.t1 === 6 && games.t2 === 6;
-                    
-                    if (shouldEndSet && !isSixSix) {
-                        sets.push({ t1: games.t1, t2: games.t2 });
-                        games = { t1: 0, t2: 0 };
-                    }
-
-                    currentServer = getNextServer();
-                } else if (points[scored] === "40" && points[conceded] === "40") {
-                    if (config.deuceRule === "goldenPoint") {
-                        games[scored]++;
-                        points = { t1: "0", t2: "0" };
-                        deuceState = null;
-
-                        const shouldEndSet = (games[scored] >= 6 && games[conceded] <= 4) || (games[scored] >= 7 && games[scored] - games[conceded] >= 2);
-                        const isSixSix = games.t1 === 6 && games.t2 === 6;
-                        
-                        if (shouldEndSet && !isSixSix) {
-                            sets.push({ t1: games.t1, t2: games.t2 });
-                            games = { t1: 0, t2: 0 };
-                        }
-
-                        currentServer = getNextServer();
-                    } else if (config.deuceRule === "advantage") {
-                        points[scored] = "AD";
-                        deuceState = scored === "t1" ? "AD T1" : "AD T2";
-                    }
-                } else if (points[scored] === "40" && points[conceded] !== "40" && points[conceded] !== "AD") {
-                    games[scored]++;
-                    points = { t1: "0", t2: "0" };
-                    deuceState = null;
-
-                    const shouldEndSet = (games[scored] >= 6 && games[conceded] <= 4) || (games[scored] >= 7 && games[scored] - games[conceded] >= 2);
-                    const isSixSix = games.t1 === 6 && games.t2 === 6;
-                    
-                    if (shouldEndSet && !isSixSix) {
-                        sets.push({ t1: games.t1, t2: games.t2 });
-                        games = { t1: 0, t2: 0 };
-                    }
-
-                    currentServer = getNextServer();
-                } else {
-                    points[scored] = nextScore(points[scored]);
-                }
-            });
-
-            return { sets, games, points, currentServer, deuceState, isTiebreak };
-        }
-
-        export default function App() {
-            const [screen, setScreen] = useState("setup");
-            const [config, setConfig] = useState(null);
-            const [events, setEvents] = useState([]);
-
-            function handleStart(cfg) {
-                setConfig(cfg);
-                setEvents([]);
-                setScreen("tracker");
-            }
-
-            function handleAddEvent(ev) {
-                setEvents(prev => [...prev, ev]);
-            }
-
-            function handleUndo() {
-                setEvents(prev => prev.slice(0, -1));
-            }
-
-            if (screen === "setup") return <SetupScreen onStart={handleStart} />;
-            if (screen === "tracker")
+            <div style={{ overflowY: "auto", padding: 12, flex: 1 }}>
+              {[...events].reverse().map((ev, i) => {
+                const p = players.find(x => x.id === ev.player);
+                const eventIndex = events.length - i - 1;
                 return (
-                    <TrackerScreen
-                        config={config}
-                        events={events}
-                        onAddEvent={handleAddEvent}
-                        onUndo={handleUndo}
-                        onDeleteEvent={() => {}}
-                        onFinish={() => setScreen("stats")}
-                        onSetupBack={() => setScreen("setup")}
-                    />
+                  <div key={i} style={{
+                    background: "rgba(255,255,255,0.03)", borderRadius: 8,
+                    padding: "9px 11px", marginBottom: 6, border: "1px solid rgba(255,255,255,0.05)",
+                    display: "flex", justifyContent: "space-between", alignItems: "flex-start"
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        display: "flex", justifyContent: "space-between",
+                        alignItems: "center", marginBottom: 4
+                      }}>
+                        <span style={{
+                          fontSize: 12, fontWeight: 700, color: p?.color || "#f1f5f9"
+                        }}>
+                          {ev.playerName}
+                        </span>
+                        <span style={{ fontSize: 10, color: "#334155" }}>#{eventIndex + 1}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                        <ShotBadge shot={ev.shotLabel} />
+                        <ResultBadge result={ev.result} />
+                        {ev.victimName && (
+                          <>
+                            <span style={{ fontSize: 10, color: "#f97316" }}>→ {ev.victimName}</span>
+                            {ev.victimShotLabel && <ShotBadge shot={ev.victimShotLabel} />}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <button onClick={() => onDeleteEvent(eventIndex)} style={{
+                      background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.3)",
+                      borderRadius: 4, color: "#ef4444", cursor: "pointer", padding: "4px 8px",
+                      fontSize: 11, fontWeight: 600, fontFamily: "inherit", marginLeft: 8
+                    }}>
+                      ✕
+                    </button>
+                  </div>
                 );
+              })}
+              {events.length === 0 && (
+                <p style={{
+                  color: "#334155", fontSize: 13, textAlign: "center", marginTop: 40
+                }}>
+                  Sin jugadas aún
+                </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {pendingServeChoice && (
+        <>
+          <div onClick={() => setPendingServeChoice(null)} style={{
+            position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(4px)"
+          }} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 201, background: "#0d1526", borderRadius: 16,
+            border: "1px solid rgba(255,255,255,0.2)", padding: 28,
+            maxWidth: 400, boxShadow: "0 20px 60px rgba(0,0,0,0.8)"
+          }}>
+            <p style={{
+              fontSize: 16, fontWeight: 800, color: "#f1f5f9", marginBottom: 20, marginTop: 0,
+              letterSpacing: "-0.01em"
+            }}>
+              Game {pendingServeChoice.gameNumber} • {pendingServeChoice.team.toUpperCase()}
+            </p>
+            <p style={{
+              fontSize: 13, color: "#cbd5e1", marginBottom: 24, marginTop: 0
+            }}>
+              {`¿Quién será el segundo jugador en servir de ${pendingServeChoice.team.toUpperCase()}?`}
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {pendingServeChoice.players.map(player => (
+                <button key={player.id} onClick={() => {
+                  console.log(`Selecting second server: ${player.name} (${player.id})`);
+                  setSecondServer(player.id); // Save the second server
+                  setPendingServeChoice(null);
+                }} style={{
+                  padding: "14px 16px", borderRadius: 10, border: "2px solid",
+                  borderColor: player.color, background: player.color + "15",
+                  color: player.color, fontSize: 14, fontWeight: 700,
+                  cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s"
+                }}>
+                  {player.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {errorMessage && (
+        <>
+          <div onClick={() => setErrorMessage(null)} style={{
+            position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(4px)"
+          }} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 301, background: "#0d1526", borderRadius: 16,
+            border: "1px solid rgba(239,68,68,0.3)", padding: 28,
+            maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.8)"
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
+              <span style={{ fontSize: 28 }}>⚠️</span>
+              <div style={{ flex: 1 }}>
+                <p style={{
+                  fontSize: 15, fontWeight: 800, color: "#f1f5f9", marginBottom: 8, marginTop: 0,
+                  letterSpacing: "-0.01em"
+                }}>
+                  Jugada no válida
+                </p>
+                <p style={{
+                  fontSize: 13, color: "#cbd5e1", marginBottom: 0, marginTop: 0,
+                  lineHeight: "1.5", whiteSpace: "pre-wrap"
+                }}>
+                  {errorMessage}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setErrorMessage(null)} style={{
+              width: "100%", padding: "12px", borderRadius: 10, border: "none",
+              background: "#ef4444", color: "#fff", fontSize: 14, fontWeight: 700,
+              cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s"
+            }}>
+              Entendido
+            </button>
+          </div>
+        </>
+      )}
+
+      {setWinner && (
+        <>
+          <div onClick={() => setSetWinner(null)} style={{
+            position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(4px)"
+          }} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 401, background: "#0d1526", borderRadius: 16,
+            border: "1px solid rgba(34,197,94,0.3)", padding: 28,
+            maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.8)"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", flexDirection: "column", gap: 20, marginBottom: 20 }}>
+              <span style={{ fontSize: 60 }}>🏆</span>
+              <p style={{
+                fontSize: 18, fontWeight: 900, color: "#22c55e", marginBottom: 8, marginTop: 0,
+                letterSpacing: "-0.01em", textAlign: "center"
+              }}>
+                ¡SET GANADO!
+              </p>
+              <p style={{
+                fontSize: 24, fontWeight: 900, color: setWinner === "t1" ? "#f59e0b" : "#63b3ed", marginBottom: 0, marginTop: 0,
+                textAlign: "center"
+              }}>
+                {setWinner === "t1" ? `${config.t1p1} y ${config.t1p2}` : `${config.t2p1} y ${config.t2p2}`}
+              </p>
+            </div>
+            <button onClick={() => setSetWinner(null)} style={{
+              width: "100%", padding: "14px", borderRadius: 10, border: "none",
+              background: "linear-gradient(135deg, #22c55e, #16a34a)", color: "#fff", fontSize: 15, fontWeight: 800,
+              cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s"
+            }}>
+              ✓ CAPITO
+            </button>
+          </div>
+        </>
+      )}
+
+      {matchWinner && (
+        <>
+          <div onClick={() => setMatchWinner(null)} style={{
+            position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.8)",
+            backdropFilter: "blur(4px)"
+          }} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 501, background: "linear-gradient(135deg, #0d1526, #1a2332)", borderRadius: 16,
+            border: "2px solid #22c55e", padding: 40,
+            maxWidth: 480, boxShadow: "0 20px 80px rgba(34,197,94,0.4)"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", flexDirection: "column", gap: 24, marginBottom: 24 }}>
+              <span style={{ fontSize: 80 }}>🎉</span>
+              <p style={{
+                fontSize: 20, fontWeight: 900, color: "#22c55e", marginBottom: 8, marginTop: 0,
+                letterSpacing: "-0.01em", textAlign: "center"
+              }}>
+                ¡PARTIDA GANADA!
+              </p>
+              <p style={{
+                fontSize: 28, fontWeight: 900, color: matchWinner === "t1" ? "#f59e0b" : "#63b3ed", marginBottom: 0, marginTop: 0,
+                textAlign: "center"
+              }}>
+                {matchWinner === "t1" ? `${config.t1p1} y ${config.t1p2}` : `${config.t2p1} y ${config.t2p2}`}
+              </p>
+            </div>
+            <button onClick={() => setMatchWinner(null)} style={{
+              width: "100%", padding: "16px", borderRadius: 10, border: "none",
+              background: "linear-gradient(135deg, #22c55e, #16a34a)", color: "#fff", fontSize: 16, fontWeight: 800,
+              cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s"
+            }}>
+              ✓ ENTENDIDO
+            </button>
+          </div>
+        </>
+      )}
+
+      {tiebreakNotification && (
+        <>
+          <div onClick={() => setTiebreakNotification(false)} style={{
+            position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(4px)"
+          }} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 301, background: "#0d1526", borderRadius: 16,
+            border: "1px solid rgba(34,197,94,0.3)", padding: 28,
+            maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.8)"
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
+              <span style={{ fontSize: 28 }}>🎯</span>
+              <div style={{ flex: 1 }}>
+                <p style={{
+                  fontSize: 15, fontWeight: 800, color: "#f1f5f9", marginBottom: 8, marginTop: 0,
+                  letterSpacing: "-0.01em"
+                }}>
+                  ¡TIE-BREAK!
+                </p>
+                <p style={{
+                  fontSize: 13, color: "#cbd5e1", marginBottom: 0, marginTop: 0,
+                  lineHeight: "1.5"
+                }}>
+                  Se alcanzó 6-6 en los juegos. Procediamos con el tie-break. El primero que llegue a 7 puntos (con 2 de ventaja si es necesario) gana el set.
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setTiebreakNotification(false)} style={{
+              width: "100%", padding: "12px", borderRadius: 10, border: "none",
+              background: "#22c55e", color: "#fff", fontSize: 14, fontWeight: 700,
+              cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s"
+            }}>
+              OK
+            </button>
+          </div>
+        </>
+      )}}
+    </div>
+  );
+}
+
+function calculateScore(events, config, players, serveFirstPlayers = {}, lastServers = {}, gamesModifier = { t1: 0, t2: 0 }, pointsModifier = { t1: 0, t2: 0 }, serveSecondPlayers = { t1: null, t2: null }, secondServer = null, getServerForGame = null) {
+  const sets = [];
+  
+  // Initialize games and points with modifiers as baseline
+  let games = { 
+    t1: Math.max(0, gamesModifier.t1),
+    t2: Math.max(0, gamesModifier.t2)
+  };
+  
+  // Initialize points with modifier as baseline
+  const SCORE_SEQ = ["0", "15", "30", "40"];
+  const getPointsFromModifier = (modifier) => {
+    if (modifier >= 4) return "AD";
+    return SCORE_SEQ[Math.min(3, Math.max(0, modifier))];
+  };
+  
+  let points = { 
+    t1: getPointsFromModifier(pointsModifier.t1), 
+    t2: getPointsFromModifier(pointsModifier.t2) 
+  };
+  let currentServer = config.serving;
+  let deuceState = null;
+  let isTiebreak = false;
+
+  function getNextServer() {
+    // If we have secondServer, use the simple rotation
+    if (secondServer && getServerForGame) {
+      const gameCount = games.t1 + games.t2 + 1; // Next game number
+      return getServerForGame(gameCount);
+    }
+    
+    // Original logic (for before secondServer is set)
+    const currentTeam = players.find(p => p.id === currentServer)?.team;
+    const otherTeam = currentTeam === "t1" ? "t2" : "t1";
+    
+    const lastServer = lastServers[otherTeam];
+    
+    // If this team hasn't served yet, return the chosen first server
+    if (!lastServer) {
+      return serveFirstPlayers[otherTeam] || players.find(p => p.team === otherTeam)?.id;
+    }
+
+    // If last server was the first server, return the second server
+    if (lastServer === serveFirstPlayers[otherTeam]) {
+      return serveSecondPlayers[otherTeam] || players.filter(p => p.team === otherTeam).find(p => p.id !== serveFirstPlayers[otherTeam])?.id;
+    }
+    
+    // If last server was the second server, return the first server (team changes next)
+    return serveFirstPlayers[otherTeam] || players.find(p => p.team === otherTeam)?.id;
+  }
+
+  function getNextServerInTiebreak() {
+    // Tiebreak serve rotation: A serves 1, then C,B,D,A repeat with 2 services each
+    // Pattern: A(1), C(2), B(2), D(2), A(2), C(2), B(2), D(2), ...
+    
+    const totalPoints = parseInt(points.t1) + parseInt(points.t2);
+    
+    // Get current server player info
+    const currentServerPlayer = players.find(p => p.id === currentServer);
+    const currentTeam = currentServerPlayer?.team;
+    const otherTeam = currentTeam === "t1" ? "t2" : "t1";
+    
+    // Get partner of current server (same team, different player)
+    const currentPartner = players.find(p => p.team === currentTeam && p.id !== currentServer)?.id;
+    
+    // Get first server of other team
+    const otherTeamFirstServer = serveFirstPlayers[otherTeam] || players.find(p => p.team === otherTeam)?.id;
+    
+    // Get partner of other team's first server
+    const otherTeamPartner = players.find(p => p.team === otherTeam && p.id !== otherTeamFirstServer)?.id;
+    
+    // Build server sequence: [current, partner, otherTeamFirst, otherTeamPartner]
+    const serverSequence = [currentServer, currentPartner, otherTeamFirstServer, otherTeamPartner];
+    
+    // Calculate which server should serve based on total points
+    // totalPoints 0: index 0 (first server)
+    // totalPoints 1-2: index 1 (partner, 2 services)
+    // totalPoints 3-4: index 2 (other team first, 2 services)
+    // totalPoints 5-6: index 3 (other team partner, 2 services)
+    // totalPoints 7-8: index 0 (current again, 2 services)
+    // Pattern repeats...
+    
+    const sequenceIndex = Math.floor((totalPoints + 1) / 2) % 4;
+    return serverSequence[sequenceIndex];
+  }
+
+  function nextScoreTiebreak(c) {
+    const num = parseInt(c) || 0;
+    return String(num + 1);
+  }
+
+  events.forEach((ev) => {
+    const isPoint = ["Win", "ErrF", "FzaErr", "ErrNF"].includes(ev.result);
+    if (!isPoint) return;
+
+    if (ev.shot === "S1" && ev.result === "ErrNF") {
+      return;
+    }
+
+    const scored = ["Win", "FzaErr"].includes(ev.result) ? ev.team : (ev.team === "t1" ? "t2" : "t1");
+    const conceded = scored === "t1" ? "t2" : "t1";
+
+    // Check if we should enter tiebreak (6-6 in games)
+    if (games.t1 === 6 && games.t2 === 6) {
+      isTiebreak = true;
+      // Reset points to 0-0 when entering tiebreak
+      if (points.t1 !== "0" || points.t2 !== "0") {
+        points = { t1: "0", t2: "0" };
+      }
+    }
+
+    // Tiebreak logic
+    if (isTiebreak) {
+      const p1 = parseInt(points.t1) || 0;
+      const p2 = parseInt(points.t2) || 0;
+      
+      // Increment point
+      if (scored === "t1") {
+        points.t1 = String(p1 + 1);
+      } else {
+        points.t2 = String(p2 + 1);
+      }
+      
+      const newP1 = parseInt(points.t1);
+      const newP2 = parseInt(points.t2);
+      
+      // In tiebreak, change server after each point with special rotation
+      currentServer = getNextServerInTiebreak();
+      
+      // Check tiebreak win condition: 7+ points with 2+ lead
+      if ((newP1 >= 7 || newP2 >= 7) && Math.abs(newP1 - newP2) >= 2) {
+        // Tiebreak winner wins the set
+        games[scored]++;
+        sets.push({ t1: games.t1, t2: games.t2 });
+        games = { t1: 0, t2: 0 };
+        points = { t1: "0", t2: "0" };
+        isTiebreak = false;
+        deuceState = null;
+        currentServer = getNextServer();
+      }
+      return;
+    }
+
+    // Normal game scoring
+    if (points[scored] === "40" && points[conceded] === "AD") {
+      points[conceded] = "40";
+    } else if (points[scored] === "AD") {
+      games[scored]++;
+      points = { t1: "0", t2: "0" };
+      deuceState = null;
+
+      // Set win conditions: 6 games with opponent at 4 or less, OR 7 games with 2+ lead
+      const shouldEndSet = (games[scored] >= 6 && games[conceded] <= 4) || (games[scored] >= 7 && games[scored] - games[conceded] >= 2);
+      // But don't end if we just reached 6-6 (tiebreak)
+      const isSixSix = games.t1 === 6 && games.t2 === 6;
+      
+      if (shouldEndSet && !isSixSix) {
+        sets.push({ t1: games.t1, t2: games.t2 });
+        games = { t1: 0, t2: 0 };
+      }
+
+      currentServer = getNextServer();
+    } else if (points[scored] === "40" && points[conceded] === "40") {
+      if (config.deuceRule === "goldenPoint") {
+        games[scored]++;
+        points = { t1: "0", t2: "0" };
+        deuceState = null;
+
+        const shouldEndSet = (games[scored] >= 6 && games[conceded] <= 4) || (games[scored] >= 7 && games[scored] - games[conceded] >= 2);
+        const isSixSix = games.t1 === 6 && games.t2 === 6;
+        
+        if (shouldEndSet && !isSixSix) {
+          sets.push({ t1: games.t1, t2: games.t2 });
+          games = { t1: 0, t2: 0 };
         }
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-    </script>
-</body>
-</html>
+        currentServer = getNextServer();
+      } else if (config.deuceRule === "advantage") {
+        points[scored] = "AD";
+        deuceState = scored === "t1" ? "AD T1" : "AD T2";
+      }
+    } else if (points[scored] === "40" && points[conceded] !== "40" && points[conceded] !== "AD") {
+      games[scored]++;
+      points = { t1: "0", t2: "0" };
+      deuceState = null;
+
+      const shouldEndSet = (games[scored] >= 6 && games[conceded] <= 4) || (games[scored] >= 7 && games[scored] - games[conceded] >= 2);
+      const isSixSix = games.t1 === 6 && games.t2 === 6;
+      
+      if (shouldEndSet && !isSixSix) {
+        sets.push({ t1: games.t1, t2: games.t2 });
+        games = { t1: 0, t2: 0 };
+      }
+
+      currentServer = getNextServer();
+    } else {
+      points[scored] = nextScore(points[scored]);
+    }
+  });
+
+  // Adjust currentServer based on games and secondServer
+  // Count BOTH completed games from events AND manual modifiers
+  const totalCompletedGames = games.t1 + games.t2 + gamesModifier.t1 + gamesModifier.t2;
+  
+  // Use new getServerForGame if secondServer is set
+  if (secondServer && getServerForGame) {
+    // For the NEXT game after all completed games (events + modifiers)
+    const nextGameNumber = totalCompletedGames + 1;
+    currentServer = getServerForGame(nextGameNumber);
+  } else {
+    // Before secondServer is set, default to firstServer
+    currentServer = config.serving;
+  }
+  
+  return { sets, games, points, currentServer, deuceState, isTiebreak };
+}
+
+export default function App() {
+  const [screen, setScreen] = useState("setup");
+  const [config, setConfig] = useState(null);
+  const [events, setEvents] = useState([]);
+
+  function handleStart(cfg) {
+    setConfig(cfg);
+    setEvents([]);
+    setScreen("tracker");
+  }
+
+  function handleAddEvent(ev) {
+    setEvents(prev => [...prev, ev]);
+  }
+
+  function handleDeleteEvent(index) {
+    setEvents(prev => prev.filter((_, i) => i !== index));
+  }
+
+  function handleUndo() {
+    setEvents(prev => prev.slice(0, -1));
+  }
+
+  if (screen === "setup") return <SetupScreen onStart={handleStart} />;
+  if (screen === "tracker")
+    return (
+      <TrackerScreen
+        config={config}
+        events={events}
+        onAddEvent={handleAddEvent}
+        onUndo={handleUndo}
+        onDeleteEvent={handleDeleteEvent}
+        onFinish={() => setScreen("stats")}
+        onSetupBack={() => setScreen("setup")}
+      />
+    );
+}
