@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Coach Admin · Marco Sandroni</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .admin-grid .wide { grid-column: 1 / -1; }
+  .photo-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .photo-row img { width: 96px; height: 120px; object-fit: cover; }
+  .mod { border-bottom: 1px solid var(--line); padding-block: 20px; }
+  .mod .review { border: 0; padding: 0; }
+  .mod-tools { display: grid; gap: 10px; margin: 12px 0 0 58px; }
+  .mod-tools .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px 24px; font-family: var(--font-data); font-size: 13px; color: var(--grey); }
+  .gate { max-width: 460px; }
+  @media (max-width: 680px) { .admin-grid { grid-template-columns: 1fr; } .mod-tools { margin-left: 0; } }
+</style>
+</head>
+<body>
+<div id="demo-banner" class="banner" hidden>
+  <div class="wrap">Demo mode. Changes are saved only in this browser until Firebase is connected (see SETUP.md).</div>
+</div>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="lockup" href="./" aria-label="Open the public page">
+      <span id="logo"></span>
+      <span class="words"><span class="coach">ADMIN</span><span class="nm">Marco Sandroni</span></span>
+    </a>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+      <span class="mono" id="who" style="font-size:12px;color:#9a9a9a"></span>
+      <button class="btn btn-ghost btn-small" id="sign-out" type="button" hidden>Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="section" id="gate">
+    <div class="wrap gate">
+      <h2>Admin access</h2>
+      <p id="gate-text">Sign in with the coach's Google account to edit the profile and moderate reviews.</p>
+      <button class="btn btn-dark" id="sign-in" type="button">Sign in with Google</button>
+      <p class="msg error" id="gate-msg" role="status"></p>
+    </div>
+  </section>
+
+  <div id="app" hidden>
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Coach profile</h2>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <a class="btn btn-ghost btn-small" href="./" target="_blank" rel="noopener">Open public page</a>
+            <button class="btn btn-primary btn-small" id="copy-link" type="button">Copy public link</button>
+          </div>
+        </div>
+        <form class="panel accent chamfer" id="profile-form" novalidate>
+          <div class="admin-grid">
+            <div class="field wide">
+              <span class="label">Photo</span>
+              <div class="photo-row">
+                <img id="pf-photo-preview" src="marco.jpg" alt="Current coach photo">
+                <span class="btn btn-ghost btn-small file-btn">Change photo<input type="file" id="pf-photo" accept="image/*"></span>
+                <button class="btn btn-ghost btn-small" id="pf-photo-reset" type="button">Use original photo</button>
+              </div>
+            </div>
+            <div class="field"><label for="pf-name">Name</label><input class="input" id="pf-name" maxlength="60"></div>
+            <div class="field"><label for="pf-headline">Headline</label><input class="input" id="pf-headline" maxlength="80"></div>
+            <div class="field"><label for="pf-exp">Years of experience</label><input class="input" id="pf-exp" type="number" min="0" max="60"></div>
+            <div class="field"><label for="pf-levels">Levels</label><input class="input" id="pf-levels" maxlength="80"></div>
+            <div class="field"><label for="pf-langs">Languages</label><input class="input" id="pf-langs" maxlength="80"></div>
+            <div class="field"><label for="pf-price">Price <span style="font-weight:400;color:var(--grey)">· leave empty to hide</span></label><input class="input" id="pf-price" maxlength="60" placeholder="e.g. €40 / hour"></div>
+            <div class="field"><label for="pf-email">Contact email</label><input class="input" id="pf-email" type="email" maxlength="80"></div>
+            <div class="field wide"><label for="pf-bio">About</label><textarea class="input" id="pf-bio" rows="4" maxlength="600"></textarea></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-dark" type="submit" id="pf-save">Save profile</button>
+            <span class="msg" id="pf-msg" role="status"></span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Reviews</h2>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-small" id="add-samples" type="button">Add sample reviews</button>
+            <button class="btn btn-danger btn-small" id="remove-samples" type="button">Delete sample reviews</button>
+          </div>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div id="mod-list"><p class="skeleton">Loading reviews…</p></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

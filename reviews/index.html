@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coach Marco Sandroni · Reviews</title>
+<meta name="description" content="Padel coach Marco Sandroni. 6 years of experience, all levels, lessons in Italian, English and Spanish. Read player reviews and rate your lesson.">
+<meta property="og:type" content="profile">
+<meta property="og:title" content="Coach Marco Sandroni · Player reviews">
+<meta property="og:description" content="6 years of experience · All levels · Italian, English, Spanish. Read reviews and rate your lesson.">
+<meta property="og:image" content="https://marcosandroni25.github.io/padeltrack/reviews/marco.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0D0D0D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="demo-banner" class="banner" hidden>
+  <div class="wrap">Demo mode. Reviews are saved only in this browser until Firebase is connected (see SETUP.md).</div>
+</div>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="lockup" href="./" aria-label="Coach Marco Sandroni">
+      <span id="logo"></span>
+      <span class="words"><span class="coach">COACH</span><span class="nm">Marco Sandroni</span></span>
+    </a>
+    <button class="btn btn-primary btn-small" id="copy-link" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+      Copy link
+    </button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <img class="portrait chamfer" id="p-photo" src="marco.jpg" alt="Marco Sandroni on court, about to feed a ball">
+    <div>
+      <div class="eyebrow" style="color:#8c8c8c">Padel coach</div>
+      <h1 id="p-name">Marco Sandroni</h1>
+      <p class="headline" id="p-headline">Padel coach · Motor sciences graduate</p>
+      <p class="bio" id="p-bio"></p>
+      <ul class="facts" id="p-facts"></ul>
+      <div class="contact">
+        <span class="mail" id="p-email"></span>
+        <button class="btn btn-ghost btn-small" id="copy-email" type="button">Copy email</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<main>
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Player ratings</h2>
+      </div>
+      <div class="summary" id="summary">
+        <div>
+          <div class="big" id="avg">–</div>
+          <div id="avg-stars"></div>
+          <div class="big-sub" id="avg-count">Loading reviews…</div>
+        </div>
+        <div class="dist" id="dist" aria-label="Rating distribution"></div>
+        <div class="cats" id="cats" aria-label="Average by category"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="rate">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="form-title">Rate your lesson</h2>
+      </div>
+      <div id="mine-box"></div>
+      <form class="panel accent chamfer" id="review-form" novalidate hidden>
+        <div class="form-grid">
+          <div class="field"><label for="f-first">First name</label><input class="input" id="f-first" maxlength="40" autocomplete="given-name" required></div>
+          <div class="field"><label for="f-last">Last name</label><input class="input" id="f-last" maxlength="40" autocomplete="family-name" required></div>
+          <div class="field"><label for="f-country">Country</label><input class="input" id="f-country" maxlength="56" autocomplete="country-name" placeholder="e.g. Spain" required></div>
+        </div>
+
+        <div class="rate-grid" id="rate-grid"></div>
+        <div class="overall-preview" id="overall-preview"></div>
+
+        <div class="field" style="margin-top:20px">
+          <label for="f-comment">Comment</label>
+          <textarea class="input" id="f-comment" maxlength="100" rows="3" placeholder="What changed in your game?" required></textarea>
+          <div class="counter" id="f-counter">0 / 100</div>
+        </div>
+
+        <div class="field" style="margin-top:8px">
+          <span class="label">Photos <span style="font-weight:400;color:var(--grey)">· optional, up to 3</span></span>
+          <div class="photo-picker" id="photo-picker">
+            <span class="btn btn-ghost btn-small file-btn" id="photo-add">Add photos<input type="file" id="f-photos" accept="image/*" multiple></span>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-dark" type="submit" id="f-submit">Post review</button>
+          <button class="btn btn-ghost" type="button" id="f-cancel" hidden>Cancel</button>
+          <span class="msg" id="f-msg" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Reviews</h2>
+        <label class="sr-only" for="sort">Sort reviews</label>
+        <select class="select" id="sort">
+          <option value="newest">Newest first</option>
+          <option value="highest">Highest rated</option>
+          <option value="lowest">Lowest rated</option>
+        </select>
+      </div>
+      <div class="reviews" id="reviews"><p class="skeleton">Loading reviews…</p></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>Coach Marco Sandroni · From conscious movement to match play.</span>
+    <span class="mono" id="foot-count"></span>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

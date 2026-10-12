@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// Paste into Firebase console → Firestore Database → Rules, then Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Keep in sync with ADMIN_EMAIL in config.js.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'marco.sandroni25@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isStr(v, min, max) {
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+
+    function isStar(v) {
+      return v is int && v >= 1 && v <= 5;
+    }
+
+    // Fields a reviewer may write.
+    function validContent(d) {
+      return isStr(d.firstName, 1, 40)
+        && isStr(d.lastName, 1, 40)
+        && isStr(d.country, 1, 56)
+        && isStr(d.comment, 1, 100)
+        && d.photos is list && d.photos.size() <= 3
+        && d.ratings is map
+        && d.ratings.keys().hasOnly(['technical', 'communication', 'planning', 'motivation', 'professionalism'])
+        && d.ratings.keys().hasAll(['technical', 'communication', 'planning', 'motivation', 'professionalism'])
+        && isStar(d.ratings.technical)
+        && isStar(d.ratings.communication)
+        && isStar(d.ratings.planning)
+        && isStar(d.ratings.motivation)
+        && isStar(d.ratings.professionalism);
+    }
+
+    function hasOnlyReviewKeys(d) {
+      return d.keys().hasOnly(['firstName', 'lastName', 'country', 'comment', 'photos', 'ratings',
+                               'hidden', 'reply', 'sample', 'createdAt', 'updatedAt']);
+    }
+
+    match /profile/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // One review per visitor: the document id is the visitor's
+    // (anonymous) Firebase Auth uid, tied to their browser.
+    match /reviews/{uid} {
+      allow get: if resource.data.hidden == false
+        || isAdmin()
+        || (request.auth != null && request.auth.uid == uid);
+      allow list: if resource.data.hidden == false || isAdmin();
+
+      allow create: if isAdmin()
+        || (request.auth != null && request.auth.uid == uid
+            && hasOnlyReviewKeys(request.resource.data)
+            && validContent(request.resource.data)
+            && request.resource.data.hidden == false
+            && request.resource.data.reply == null
+            && request.resource.data.sample == false
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.updatedAt == request.time);
+
+      // Reviewers edit their own content; only the admin changes
+      // visibility, replies and sample flags.
+      allow update: if isAdmin()
+        || (request.auth != null && request.auth.uid == uid
+            && hasOnlyReviewKeys(request.resource.data)
+            && validContent(request.resource.data)
+            && request.resource.data.hidden == resource.data.hidden
+            && request.resource.data.reply == resource.data.reply
+            && request.resource.data.sample == resource.data.sample
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.updatedAt == request.time);
+
+      allow delete: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+    }
+  }
+}
