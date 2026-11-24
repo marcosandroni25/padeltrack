@@ -1,0 +1,166 @@
+{
+  "communities": {
+    "0": [
+      "padeltrack",
+      "padeltrack_resultbadge",
+      "padeltrack_results",
+      "padeltrack_score_seq",
+      "padeltrack_shot_groups",
+      "padeltrack_shot_types",
+      "padeltrack_shotbadge",
+      "padeltrack_trackerscreen",
+      "padeltrack_trackerscreen_handleregister",
+      "ref_react"
+    ],
+    "1": [
+      "github_workflows_static",
+      "github_workflows_static_concurrency",
+      "github_workflows_static_concurrency_cancel_in_progress",
+      "github_workflows_static_concurrency_group",
+      "github_workflows_static_name",
+      "github_workflows_static_permissions",
+      "github_workflows_static_permissions_contents",
+      "github_workflows_static_permissions_id_token",
+      "github_workflows_static_permissions_pages"
+    ],
+    "2": [
+      "github_workflows_static_deploy_environment",
+      "github_workflows_static_deploy_runs_on",
+      "github_workflows_static_environment_name",
+      "github_workflows_static_environment_url",
+      "github_workflows_static_jobs",
+      "github_workflows_static_jobs_deploy"
+    ],
+    "3": [
+      "github_workflows_static_deploy_steps",
+      "github_workflows_static_steps_id",
+      "github_workflows_static_steps_name",
+      "github_workflows_static_steps_uses",
+      "github_workflows_static_steps_with",
+      "github_workflows_static_with_path"
+    ],
+    "4": [
+      "padeltrack_app",
+      "padeltrack_app_handleaddevent",
+      "padeltrack_app_handledeleteevent",
+      "padeltrack_app_handlestart",
+      "padeltrack_app_handleundo",
+      "padeltrack_setupscreen"
+    ],
+    "5": [
+      "padeltrack_calculatescore",
+      "padeltrack_calculatescore_getnextserver",
+      "padeltrack_calculatescore_getnextserverintiebreak",
+      "padeltrack_calculatescore_nextscoretiebreak",
+      "padeltrack_nextscore"
+    ],
+    "6": [
+      "github_workflows_static_on",
+      "github_workflows_static_on_push",
+      "github_workflows_static_on_workflow_dispatch",
+      "github_workflows_static_push_branches"
+    ]
+  },
+  "cohesion": {
+    "0": 0.24444444444444444,
+    "1": 0.2222222222222222,
+    "2": 0.3333333333333333,
+    "3": 0.3333333333333333,
+    "4": 0.3333333333333333,
+    "5": 0.4,
+    "6": 0.5
+  },
+  "gods": [
+    {
+      "id": "padeltrack_app",
+      "label": "App()",
+      "degree": 7
+    },
+    {
+      "id": "padeltrack_trackerscreen",
+      "label": "TrackerScreen()",
+      "degree": 6
+    },
+    {
+      "id": "padeltrack_calculatescore",
+      "label": "calculateScore()",
+      "degree": 6
+    },
+    {
+      "id": "github_workflows_static_deploy_steps",
+      "label": "steps",
+      "degree": 5
+    },
+    {
+      "id": "github_workflows_static_permissions",
+      "label": "permissions",
+      "degree": 4
+    },
+    {
+      "id": "github_workflows_static_jobs_deploy",
+      "label": "deploy",
+      "degree": 4
+    },
+    {
+      "id": "github_workflows_static_concurrency",
+      "label": "concurrency",
+      "degree": 3
+    },
+    {
+      "id": "github_workflows_static_deploy_environment",
+      "label": "environment",
+      "degree": 3
+    },
+    {
+      "id": "github_workflows_static_on",
+      "label": "on",
+      "degree": 3
+    },
+    {
+      "id": "padeltrack_resultbadge",
+      "label": "ResultBadge()",
+      "degree": 2
+    }
+  ],
+  "surprises": [
+    {
+      "source": "App()",
+      "target": "TrackerScreen()",
+      "source_files": [
+        "padeltrack.html",
+        "padeltrack.html"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 0 → community 4"
+    },
+    {
+      "source": "TrackerScreen()",
+      "target": "calculateScore()",
+      "source_files": [
+        "padeltrack.html",
+        "padeltrack.html"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "note": "Bridges community 0 → community 5"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `deploy` connect `Community 2` to `Community 3`?",
+      "why": "High betweenness centrality (0.169) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `jobs` connect `Community 2` to `Community 1`?",
+      "why": "High betweenness centrality (0.144) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `steps` connect `Community 3` to `Community 2`?",
+      "why": "High betweenness centrality (0.105) - this node is a cross-community bridge."
+    }
+  ]
+}
